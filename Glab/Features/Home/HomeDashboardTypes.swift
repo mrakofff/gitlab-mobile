@@ -72,6 +72,89 @@ nonisolated enum HomeDashboardSection:
     }
 }
 
+nonisolated enum HomeMergeRequestStatus:
+    Equatable,
+    Sendable
+{
+    case draft
+    case ready
+    case waitingForApproval
+    case changesRequested
+    case conflicts
+    case needsRebase
+    case unresolvedThreads
+    case pipelineRunning
+    case pipelineFailed
+    case open
+
+    init(_ mergeRequest: GitLabMergeRequest) {
+        let pipeline =
+            mergeRequest.headPipeline?.status
+        if
+            mergeRequest.isDraft
+                || mergeRequest.detailedMergeStatus
+                == "draft_status"
+        {
+            self = .draft
+            return
+        }
+
+        switch mergeRequest.detailedMergeStatus {
+        case "mergeable":
+            self = .ready
+        case "not_approved":
+            self = .waitingForApproval
+        case "requested_changes":
+            self = .changesRequested
+        case "conflict":
+            self = .conflicts
+        case "need_rebase":
+            self = .needsRebase
+        case "discussions_not_resolved":
+            self = .unresolvedThreads
+        case "ci_still_running":
+            self = .pipelineRunning
+        case "ci_must_pass":
+            self = pipeline == "failed"
+                ? .pipelineFailed
+                : .pipelineRunning
+        default:
+            if mergeRequest.hasConflicts == true {
+                self = .conflicts
+            } else if pipeline == "failed" {
+                self = .pipelineFailed
+            } else {
+                self = .open
+            }
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .draft:
+            "Draft"
+        case .ready:
+            "Ready to merge"
+        case .waitingForApproval:
+            "Waiting for approval"
+        case .changesRequested:
+            "Changes requested"
+        case .conflicts:
+            "Has conflicts"
+        case .needsRebase:
+            "Needs rebase"
+        case .unresolvedThreads:
+            "Unresolved threads"
+        case .pipelineRunning:
+            "Pipeline running"
+        case .pipelineFailed:
+            "Pipeline failed"
+        case .open:
+            "Open"
+        }
+    }
+}
+
 nonisolated struct GitLabHomeWorkItem:
     Identifiable,
     Equatable,

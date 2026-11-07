@@ -8,6 +8,7 @@ nonisolated enum GitLabAppTab:
     Sendable
 {
     case home
+    case inbox
     case todos
 
     static let defaultTab = Self.home
@@ -16,6 +17,8 @@ nonisolated enum GitLabAppTab:
         switch self {
         case .home:
             "Home"
+        case .inbox:
+            "Inbox"
         case .todos:
             "Todos"
         }
@@ -25,6 +28,8 @@ nonisolated enum GitLabAppTab:
         switch self {
         case .home:
             "house.fill"
+        case .inbox:
+            "tray.fill"
         case .todos:
             "checklist"
         }
@@ -52,6 +57,7 @@ struct SignedInShellView: View {
         MergeRequestsModel
     @State private var reviewRequestsModel:
         MergeRequestsModel
+    @State private var projectsModel: ProjectsModel
     @State private var todosModel: TodosModel
     @State private var todoCatchUpModel:
         TodoCatchUpModel
@@ -341,6 +347,12 @@ struct SignedInShellView: View {
                 loader: mergeRequestLoader
             )
         )
+        _projectsModel = State(
+            initialValue: ProjectsModel(
+                mode: .recent,
+                loader: projectLoader
+            )
+        )
         let todosModel = TodosModel(
             loader: todoService,
             mutator: todoService,
@@ -404,6 +416,8 @@ struct SignedInShellView: View {
                         createdMergeRequestsModel,
                     reviewRequestsModel:
                         reviewRequestsModel,
+                    todosModel: todosModel,
+                    projectsModel: projectsModel,
                     issueLoader: issueLoader,
                     mergeRequestLoader: mergeRequestLoader,
                     mergeRequestApprovalService:
@@ -435,11 +449,15 @@ struct SignedInShellView: View {
                     incomingRoute:
                         incomingRoute,
                     onResourceEdited:
-                        reconcileEditedResource
-                ) {
-                    incomingRoute = nil
-                    incomingLinkModel.clear()
-                }
+                        reconcileEditedResource,
+                    didOpenIncomingRoute: {
+                        incomingRoute = nil
+                        incomingLinkModel.clear()
+                    },
+                    onShowTodos: {
+                        selectedTab = .todos
+                    }
+                )
             } label: {
                 Label(
                     GitLabAppTab.home.title,
@@ -447,6 +465,17 @@ struct SignedInShellView: View {
                         GitLabAppTab.home.systemImage
                 )
                 .accessibilityIdentifier("tab.home")
+            }
+
+            Tab(value: GitLabAppTab.inbox) {
+                GitLabInboxPlaceholderView()
+            } label: {
+                Label(
+                    GitLabAppTab.inbox.title,
+                    systemImage:
+                        GitLabAppTab.inbox.systemImage
+                )
+                .accessibilityIdentifier("tab.inbox")
             }
 
             Tab(value: GitLabAppTab.todos) {
@@ -851,5 +880,27 @@ struct SignedInShellView: View {
                     .dismissAuthenticationNotice()
             }
         }
+    }
+}
+
+private struct GitLabInboxPlaceholderView: View {
+    var body: some View {
+        NavigationStack {
+            GitLabEmptyStateView(
+                title: "Inbox",
+                message:
+                    "Mentions, reviews, and assignments in one place. "
+                    + "Coming soon.",
+                systemImage: "tray"
+            )
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity
+            )
+            .background(Color.glabCanvas)
+            .navigationTitle("Inbox")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .accessibilityIdentifier("inbox.placeholder")
     }
 }

@@ -25,3 +25,4 @@
 - GitLab upload APIs can return `application/octet-stream`. Enforce limits, then validate image bytes by decoding.
 - Preserve original media extensions when playback URLs are extensionless API routes.
 - Fullscreen image viewers should reload at viewer resolution instead of scaling inline thumbnails.
+- Dashboard counters should use `reliableItemCount` and show `N+` when only a first page is known; never present a loaded page size as a total.
