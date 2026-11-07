@@ -132,10 +132,17 @@ struct YourMergeRequestsView: View {
     let appSession: AppSession
     let onResourceEdited:
         (GitLabResourceEditResult) -> Void
-
-    @State private var selectedMode:
-        GitLabMergeRequestListMode =
+    var initialMode: GitLabMergeRequestListMode =
         .assigned
+
+    @State private var pickedMode:
+        GitLabMergeRequestListMode?
+
+    private var selectedMode:
+        GitLabMergeRequestListMode
+    {
+        pickedMode ?? initialMode
+    }
 
     var body: some View {
         selectedList
@@ -145,7 +152,10 @@ struct YourMergeRequestsView: View {
             ) {
                 Picker(
                     "Merge request list",
-                    selection: $selectedMode
+                    selection: Binding(
+                        get: { selectedMode },
+                        set: { pickedMode = $0 }
+                    )
                 ) {
                     ForEach(
                         GitLabMergeRequestListMode

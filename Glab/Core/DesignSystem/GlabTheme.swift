@@ -11,7 +11,7 @@ enum GlabTheme {
             .glabBrandChrome
         navigationAppearance.shadowColor = .clear
         navigationAppearance.titleTextAttributes = [
-            .foregroundColor: UIColor.white,
+            .foregroundColor: UIColor.label,
             .font:
                 scaledFont(
                     named: "Lato-SemiBold",
@@ -20,7 +20,7 @@ enum GlabTheme {
                 ),
         ]
         navigationAppearance.largeTitleTextAttributes = [
-            .foregroundColor: UIColor.white,
+            .foregroundColor: UIColor.label,
             .font:
                 scaledFont(
                     named: "Lato-Bold",
@@ -39,14 +39,13 @@ enum GlabTheme {
             navigationAppearance
         navigationBar.compactScrollEdgeAppearance =
             navigationAppearance
-        navigationBar.tintColor = .white
-        navigationBar.barStyle = .black
+        navigationBar.tintColor = UIColor(named: "GlabAccent")
 
         UIBarButtonItem.appearance(
             whenContainedInInstancesOf: [
                 UINavigationBar.self,
             ]
-        ).tintColor = .white
+        ).tintColor = UIColor(named: "GlabAccent")
     }
 
     private static func scaledFont(
@@ -207,10 +206,6 @@ extension View {
         )
         .toolbarBackground(
             .visible,
-            for: .navigationBar
-        )
-        .toolbarColorScheme(
-            .dark,
             for: .navigationBar
         )
     }

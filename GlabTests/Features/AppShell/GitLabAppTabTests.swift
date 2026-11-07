@@ -3,9 +3,9 @@ import Testing
 
 @Suite("GitLab app tabs")
 struct GitLabAppTabTests {
-    @Test("The MVP exposes exactly Home and Todos")
-    func exposesOnlyMVPTabs() {
-        #expect(GitLabAppTab.allCases == [.home, .todos])
+    @Test("The app exposes Home, Inbox, and Todos")
+    func exposesAppTabs() {
+        #expect(GitLabAppTab.allCases == [.home, .inbox, .todos])
         #expect(GitLabAppTab.defaultTab == .home)
     }
 
@@ -13,6 +13,8 @@ struct GitLabAppTabTests {
     func presentsTabs() {
         #expect(GitLabAppTab.home.title == "Home")
         #expect(GitLabAppTab.home.systemImage == "house.fill")
+        #expect(GitLabAppTab.inbox.title == "Inbox")
+        #expect(GitLabAppTab.inbox.systemImage == "tray.fill")
         #expect(GitLabAppTab.todos.title == "Todos")
         #expect(GitLabAppTab.todos.systemImage == "checklist")
     }

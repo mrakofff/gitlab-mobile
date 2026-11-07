@@ -1,5 +1,231 @@
 import SwiftUI
 
+extension GitLabPaginatedResourceModel {
+    var statCount: Int? {
+        reliableItemCount
+            ?? (hasLoaded ? items.count : nil)
+    }
+
+    var statCountText: String {
+        guard let statCount else {
+            return "–"
+        }
+        let isLowerBound =
+            reliableItemCount == nil
+            && nextPageURL != nil
+        return isLowerBound
+            ? "\(statCount)+"
+            : "\(statCount)"
+    }
+}
+
+struct HomeNeedsAttentionHeader: View {
+    let count: Int?
+    let reviews: Int?
+    let todos: Int?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Image(
+                    systemName:
+                        "exclamationmark.triangle.fill"
+                )
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+
+                Text("Needs attention")
+                    .font(.glabTitle3.bold())
+
+                Text(count.map(String.init) ?? "–")
+                    .font(.glabTitle3.bold())
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+
+            if let summary {
+                Text(summary)
+                    .font(.glabSubheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("home.needsAttention")
+    }
+
+    private var summary: String? {
+        var parts: [String] = []
+        if let reviews {
+            parts.append(
+                "\(reviews) \(reviews == 1 ? "review" : "reviews")"
+            )
+        }
+        if let todos {
+            parts.append(
+                "\(todos) \(todos == 1 ? "todo" : "todos")"
+            )
+        }
+        return parts.isEmpty
+            ? nil
+            : parts.joined(separator: " · ")
+    }
+}
+
+struct HomeSectionHeader: View {
+    let title: String
+    let count: String?
+    let identifier: String
+    let onSeeAll: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.glabHeadline)
+                .foregroundStyle(.primary)
+
+            if let count {
+                Text(count)
+                    .font(.glabCaption.weight(.semibold))
+                    .monospacedDigit()
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(
+                        Color.glabAccent.opacity(0.12),
+                        in: .capsule
+                    )
+                    .foregroundStyle(Color.glabAccent)
+            }
+
+            Spacer(minLength: 8)
+
+            Button("See all", action: onSeeAll)
+                .font(.glabSubheadline)
+                .accessibilityIdentifier(identifier)
+        }
+        .textCase(nil)
+    }
+}
+
+struct HomeMergeRequestRow: View {
+    let mergeRequest: GitLabMergeRequest
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Text(status.title)
+                    .font(.glabCaption.weight(.semibold))
+                    .foregroundStyle(statusColor)
+
+                Spacer(minLength: 8)
+
+                Text(
+                    GitLabRelativeTimeFormatter.string(
+                        from: mergeRequest.updatedAt
+                    )
+                )
+                .font(.glabCaption)
+                .foregroundStyle(.secondary)
+            }
+
+            Text(mergeRequest.title)
+                .font(.glabBody.weight(.medium))
+                .lineLimit(2)
+
+            Text(footer)
+                .font(.glabCaption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.vertical, 3)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var status: HomeMergeRequestStatus {
+        HomeMergeRequestStatus(mergeRequest)
+    }
+
+    private var statusColor: Color {
+        switch status {
+        case .ready:
+            .green
+        case .waitingForApproval, .needsRebase,
+            .unresolvedThreads:
+            .orange
+        case .changesRequested, .conflicts,
+            .pipelineFailed:
+            .red
+        case .pipelineRunning:
+            .blue
+        case .draft, .open:
+            .secondary
+        }
+    }
+
+    private var footer: String {
+        "\(mergeRequest.references.short) · "
+            + mergeRequest.author.displayName
+    }
+}
+
+struct HomeIssueRow: View {
+    let issue: GitLabIssue
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(issue.title)
+                .font(.glabBody.weight(.medium))
+                .lineLimit(2)
+
+            Text(footer)
+                .font(.glabCaption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.vertical, 3)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var footer: String {
+        [
+            issue.references.full,
+            GitLabRelativeTimeFormatter.string(
+                from: issue.updatedAt
+            ),
+        ].joined(separator: " · ")
+    }
+}
+
+struct HomeDashboardSectionPlaceholder: View {
+    let message: String
+    var isLoading = false
+    var retry: (() -> Void)?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityHidden(true)
+            }
+
+            Text(message)
+                .font(.glabSubheadline)
+                .foregroundStyle(.secondary)
+
+            if let retry {
+                Spacer(minLength: 8)
+                Button("Retry", action: retry)
+                    .font(.glabSubheadline)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
+
 struct HomeCatchUpShortcutRow: View {
     let count: Int?
 

@@ -3,6 +3,7 @@ import SwiftUI
 private enum HomeNavigationRoute: Hashable {
     case catchUp
     case search
+    case reviews
 }
 
 enum HomeSheetDestination: Identifiable {
@@ -51,6 +52,8 @@ struct HomeView: View {
         MergeRequestsModel
     let reviewRequestsModel:
         MergeRequestsModel
+    let todosModel: TodosModel
+    let projectsModel: ProjectsModel
     let issueLoader: any GitLabIssueLoading
     let mergeRequestLoader:
         any GitLabMergeRequestLoading
@@ -92,6 +95,7 @@ struct HomeView: View {
     let onResourceEdited:
         (GitLabResourceEditResult) -> Void
     let didOpenIncomingRoute: () -> Void
+    let onShowTodos: () -> Void
 
     @State private var path = NavigationPath()
     @State private var
@@ -106,6 +110,10 @@ struct HomeView: View {
     var body: some View {
         NavigationStack(path: $path) {
             GlabList {
+                if !model.hasTotalWorkFailure {
+                    overviewSection
+                }
+
                 if session.apiAccess == .readOnly {
                     Section {
                         readOnlyCallout
@@ -134,8 +142,8 @@ struct HomeView: View {
                     }
                 }
 
-                Section {
-                    if model.hasTotalWorkFailure {
+                if model.hasTotalWorkFailure {
+                    Section {
                         GitLabRetryStateView(
                             message:
                                 "Your GitLab work could not be loaded. "
@@ -148,33 +156,17 @@ struct HomeView: View {
                         .frame(minHeight: 280)
                         .listRowBackground(Color.clear)
                         .listRowInsets(.init())
-                    } else {
-                        ForEach(HomeDashboardSection.displayedCases, id: \.self) {
-                            section in
-                            NavigationLink(value: section) {
-                                HomeWorkShortcutRow(
-                                    section: section,
-                                    presentation: model.presentation(
-                                        for: section
-                                    )
-                                )
-                            }
-                            .accessibilityIdentifier(
-                                "home.shortcut.\(section.rawValue)"
-                            )
-                        }
                     }
-                } header: {
-                    Text("My Work")
-                        .font(.glabTitle2.bold())
-                        .foregroundStyle(.primary)
-                        .textCase(nil)
-                        .padding(.bottom, 4)
+                } else {
+                    mergeRequestsSection
+                    issuesSection
+                    projectsSection
                 }
-                .headerProminence(.increased)
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Home")
+            .navigationTitle(
+                session.host.siteURL.host() ?? "Home"
+            )
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: HomeDashboardSection.self) {
                 section in
@@ -205,6 +197,10 @@ struct HomeView: View {
                         model: searchModel,
                         accountID: accountID,
                         appSession: appSession
+                    )
+                case .reviews:
+                    mergeRequestsDestination(
+                        initialMode: .reviewRequested
                     )
                 }
             }
@@ -526,6 +522,328 @@ struct HomeView: View {
         }
     }
 
+    private var overviewSection: some View {
+        Section {
+            HomeNeedsAttentionHeader(
+                count: attentionCount,
+                reviews: reviewRequestsModel.statCount,
+                todos: todosModel.pendingBadgeCount
+            )
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(
+                .init(
+                    top: 8,
+                    leading: 4,
+                    bottom: 0,
+                    trailing: 4
+                )
+            )
+
+            GitLabStatTileRow {
+                Button {
+                    path.append(
+                        HomeDashboardSection
+                            .assignedMergeRequests
+                    )
+                } label: {
+                    GitLabStatTile(
+                        title: "MRs",
+                        tint: Color.glabAccent,
+                        value:
+                            assignedMergeRequestsModel
+                            .statCountText,
+                        icon: {
+                            GitLabIconView(
+                                .mergeRequest,
+                                pointSize: 18
+                            )
+                        }
+                    )
+                }
+                .accessibilityIdentifier(
+                    "home.tile.mergeRequests"
+                )
+
+                Button {
+                    path.append(
+                        HomeNavigationRoute.reviews
+                    )
+                } label: {
+                    GitLabStatTile(
+                        title: "Review",
+                        tint: Color.pink,
+                        value:
+                            reviewRequestsModel
+                            .statCountText,
+                        icon: {
+                            Image(systemName: "eye")
+                        }
+                    )
+                }
+                .accessibilityIdentifier(
+                    "home.tile.review"
+                )
+
+                Button {
+                    onShowTodos()
+                } label: {
+                    GitLabStatTile(
+                        title: "Todos",
+                        tint: Color.orange,
+                        value:
+                            todosModel
+                            .pendingBadgeCount
+                            .map(String.init)
+                            ?? "–",
+                        icon: {
+                            Image(systemName: "checklist")
+                        }
+                    )
+                }
+                .accessibilityIdentifier(
+                    "home.tile.todos"
+                )
+
+                Button {
+                    path.append(
+                        HomeDashboardSection
+                            .recentProjects
+                    )
+                } label: {
+                    GitLabStatTile(
+                        title: "Projects",
+                        tint: Color.indigo,
+                        value:
+                            projectsModel
+                            .statCountText,
+                        icon: {
+                            Image(systemName: "folder")
+                        }
+                    )
+                }
+                .accessibilityIdentifier(
+                    "home.tile.projects"
+                )
+            }
+            .buttonStyle(.plain)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .listRowInsets(
+                .init(
+                    top: 4,
+                    leading: 4,
+                    bottom: 4,
+                    trailing: 4
+                )
+            )
+        }
+    }
+
+    private var attentionCount: Int? {
+        let reviews = reviewRequestsModel.statCount
+        let todos = todosModel.pendingBadgeCount
+        guard reviews != nil || todos != nil else {
+            return nil
+        }
+        return (reviews ?? 0) + (todos ?? 0)
+    }
+
+    private var mergeRequestsSection: some View {
+        Section {
+            if
+                assignedMergeRequestsModel
+                    .items.isEmpty
+            {
+                workPlaceholder(
+                    for: assignedMergeRequestsModel,
+                    emptyMessage:
+                        HomeDashboardSection
+                        .assignedMergeRequests
+                        .emptyMessage
+                )
+            } else {
+                ForEach(
+                    assignedMergeRequestsModel
+                        .items.prefix(3)
+                ) { mergeRequest in
+                    NavigationLink(
+                        value:
+                            GitLabNativeRoute
+                            .mergeRequest(
+                                mergeRequest.route
+                            )
+                    ) {
+                        HomeMergeRequestRow(
+                            mergeRequest:
+                                mergeRequest
+                        )
+                    }
+                    .accessibilityIdentifier(
+                        "home.mergeRequest.row"
+                    )
+                }
+            }
+        } header: {
+            HomeSectionHeader(
+                title: "Assigned merge requests",
+                count:
+                    assignedMergeRequestsModel
+                    .statCount
+                    .map(String.init),
+                identifier:
+                    "home.mergeRequests.seeAll"
+            ) {
+                path.append(
+                    HomeDashboardSection
+                        .assignedMergeRequests
+                )
+            }
+        }
+    }
+
+    private var issuesSection: some View {
+        Section {
+            if assignedIssuesModel.items.isEmpty {
+                workPlaceholder(
+                    for: assignedIssuesModel,
+                    emptyMessage:
+                        HomeDashboardSection
+                        .assignedIssues
+                        .emptyMessage
+                )
+            } else {
+                ForEach(
+                    assignedIssuesModel
+                        .items.prefix(3)
+                ) { issue in
+                    NavigationLink(
+                        value:
+                            GitLabNativeRoute.issue(
+                                issue.route
+                            )
+                    ) {
+                        HomeIssueRow(issue: issue)
+                    }
+                    .accessibilityIdentifier(
+                        "home.issue.row"
+                    )
+                }
+            }
+        } header: {
+            HomeSectionHeader(
+                title: "My issues",
+                count:
+                    assignedIssuesModel
+                    .statCount
+                    .map(String.init),
+                identifier:
+                    "home.issues.seeAll"
+            ) {
+                path.append(
+                    HomeDashboardSection
+                        .assignedIssues
+                )
+            }
+        }
+    }
+
+    private var projectsSection: some View {
+        Section {
+            ForEach(
+                [
+                    HomeDashboardSection
+                        .recentProjects,
+                    .starredProjects,
+                ],
+                id: \.self
+            ) { section in
+                NavigationLink(value: section) {
+                    HomeWorkShortcutRow(
+                        section: section,
+                        presentation:
+                            model.presentation(
+                                for: section
+                            )
+                    )
+                }
+                .accessibilityIdentifier(
+                    "home.shortcut.\(section.rawValue)"
+                )
+            }
+        } header: {
+            Text("Projects")
+                .font(.glabHeadline)
+                .foregroundStyle(.primary)
+                .textCase(nil)
+        }
+    }
+
+    @ViewBuilder
+    private func workPlaceholder<
+        Item: Sendable,
+        Identity: Hashable & Sendable
+    >(
+        for list:
+            GitLabPaginatedResourceModel<
+                Item,
+                Identity
+            >,
+        emptyMessage: String
+    ) -> some View {
+        if list.loadError != nil {
+            HomeDashboardSectionPlaceholder(
+                message: "Could not load.",
+                retry: {
+                    Task {
+                        await list.refresh()
+                    }
+                }
+            )
+        } else if list.hasLoaded {
+            HomeDashboardSectionPlaceholder(
+                message: emptyMessage
+            )
+        } else {
+            HomeDashboardSectionPlaceholder(
+                message: "Loading…",
+                isLoading: true
+            )
+        }
+    }
+
+    private func mergeRequestsDestination(
+        initialMode: GitLabMergeRequestListMode
+    ) -> some View {
+        YourMergeRequestsView(
+            assignedModel:
+                assignedMergeRequestsModel,
+            createdModel:
+                createdMergeRequestsModel,
+            reviewsModel:
+                reviewRequestsModel,
+            loader: mergeRequestLoader,
+            approvalService:
+                mergeRequestApprovalService,
+            mergeService:
+                mergeRequestMergeService,
+            pipelineLoader:
+                pipelineLoader,
+            discussionLoader: discussionLoader,
+            discussionMutator:
+                discussionMutator,
+            reactionService:
+                reactionService,
+            editService:
+                editService,
+            accountID: accountID,
+            appSession: appSession,
+            onResourceEdited:
+                onResourceEdited,
+            initialMode: initialMode
+        )
+    }
+
     private var readOnlyCallout: some View {
         Label(
             "Read-only · Changes disabled",
@@ -595,31 +913,8 @@ struct HomeView: View {
                     onResourceEdited
             )
         case .assignedMergeRequests:
-            YourMergeRequestsView(
-                assignedModel:
-                    assignedMergeRequestsModel,
-                createdModel:
-                    createdMergeRequestsModel,
-                reviewsModel:
-                    reviewRequestsModel,
-                loader: mergeRequestLoader,
-                approvalService:
-                    mergeRequestApprovalService,
-                mergeService:
-                    mergeRequestMergeService,
-                pipelineLoader:
-                    pipelineLoader,
-                discussionLoader: discussionLoader,
-                discussionMutator:
-                    discussionMutator,
-                reactionService:
-                    reactionService,
-                editService:
-                    editService,
-                accountID: accountID,
-                appSession: appSession,
-                onResourceEdited:
-                    onResourceEdited
+            mergeRequestsDestination(
+                initialMode: .assigned
             )
         case .recentProjects:
             ProjectsView(
@@ -643,17 +938,57 @@ struct HomeView: View {
     }
 
     private func loadDashboard() async {
-        await model.loadIfNeeded()
+        async let home: Void = model.loadIfNeeded()
+        async let mergeRequests: Void =
+            assignedMergeRequestsModel.loadIfNeeded()
+        async let reviews: Void =
+            reviewRequestsModel.loadIfNeeded()
+        async let issues: Void =
+            assignedIssuesModel.loadIfNeeded()
+        async let projects: Void =
+            projectsModel.loadIfNeeded()
+        _ = await (
+            home,
+            mergeRequests,
+            reviews,
+            issues,
+            projects
+        )
         await handleAuthenticationFailure()
     }
 
     private func refreshDashboard() async {
-        await model.refresh()
+        async let home: Void = model.refresh()
+        async let mergeRequests: Void =
+            assignedMergeRequestsModel.refresh()
+        async let reviews: Void =
+            reviewRequestsModel.refresh()
+        async let issues: Void =
+            assignedIssuesModel.refresh()
+        async let projects: Void =
+            projectsModel.refresh()
+        _ = await (
+            home,
+            mergeRequests,
+            reviews,
+            issues,
+            projects
+        )
         await handleAuthenticationFailure()
     }
 
     private func handleAuthenticationFailure() async {
-        guard let error = model.authenticationFailure else {
+        guard
+            let error =
+                model.authenticationFailure
+                ?? assignedMergeRequestsModel
+                .authenticationFailure
+                ?? reviewRequestsModel
+                .authenticationFailure
+                ?? assignedIssuesModel
+                .authenticationFailure
+                ?? projectsModel.authenticationFailure
+        else {
             return
         }
 
