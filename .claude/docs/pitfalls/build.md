@@ -21,10 +21,9 @@
 - Лог сборки — в файл (`> /tmp/glab-build.log 2>&1`), читать хвост;
   полные 427-файловые логи в контекст не тащить.
 
-## Тестовый таргет не собирается на Xcode 27.2 (2026-11-07)
-- `GlabTests/Features/Pipelines/GitLabTerminalSanitizerTests.swift:25,46` —
-  «unable to type-check this expression in reasonable time»; воспроизводится
-  стабильно, файл не менялся, `xcodebuild test -only-testing:…` падает на
-  сборке всего таргета. Тесты других фич из-за этого не запускаются, пока
-  выражения в файле не разбиты на подвыражения (отдельная задача, не в
-  скоупе фазы 1). Флаги `-solver-*-threshold` не принимаются.
+## Тестовый таргет: type-check timeout на длинных конкатенациях (2026-11-07)
+- `GitLabTerminalSanitizerTests.swift` не собирался на Xcode 27.2 («unable to
+  type-check this expression in reasonable time») и валил весь таргет
+  `GlabTests`. Причина — цепочки `"a" + "b" + …` внутри `Data(( … ).utf8)`.
+  Лечение: массив строк + `.joined()`. Длинные `+`-цепочки в тестах
+  сразу писать так.

@@ -107,6 +107,8 @@ struct SignedInShellView: View {
         any GitLabUserServing
     private let commitLoader:
         any GitLabCommitLoading
+    private let projectOverviewLoader:
+        any GitLabProjectOverviewLoading
     private let repositoryLoader:
         any GitLabRepositoryLoading
     private let markdownRenderer:
@@ -206,6 +208,10 @@ struct SignedInShellView: View {
         let commitLoader = LiveGitLabCommitLoader(
             client: client
         )
+        let projectOverviewLoader =
+            LiveGitLabProjectOverviewLoader(
+                client: client
+            )
         let repositoryLoader =
             LiveGitLabRepositoryLoader(
                 client: client
@@ -267,6 +273,8 @@ struct SignedInShellView: View {
             projectStarringService
         self.userService = userService
         self.commitLoader = commitLoader
+        self.projectOverviewLoader =
+            projectOverviewLoader
         self.repositoryLoader =
             repositoryLoader
         markdownRenderer = GitLabMarkdownRenderer(
@@ -442,6 +450,8 @@ struct SignedInShellView: View {
                         projectStarringService,
                     userService: userService,
                     commitLoader: commitLoader,
+                    projectOverviewLoader:
+                        projectOverviewLoader,
                     repositoryLoader:
                         repositoryLoader,
                     searchModel:

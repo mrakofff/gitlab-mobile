@@ -35,11 +35,16 @@ struct GitLabProjectDetailView: View {
         any GitLabCommitLoading
     let repositoryLoader:
         any GitLabRepositoryLoading
+    let overviewLoader:
+        any GitLabProjectOverviewLoading
     let accountID: GitLabAccountID
     let appSession: AppSession
     let onResourceEdited:
         (GitLabResourceEditResult) -> Void
 
+    @State private var overviewModel:
+        GitLabProjectOverviewModel?
+    @State private var didCopyCloneURL = false
     @State private var model:
         GitLabProjectDetailModel
     @State private var starModel:
@@ -83,6 +88,8 @@ struct GitLabProjectDetailView: View {
             any GitLabCommitLoading,
         repositoryLoader:
             any GitLabRepositoryLoading,
+        overviewLoader:
+            any GitLabProjectOverviewLoading,
         accountID: GitLabAccountID,
         appSession: AppSession,
         onResourceEdited:
@@ -120,6 +127,7 @@ struct GitLabProjectDetailView: View {
             commitLoader
         self.repositoryLoader =
             repositoryLoader
+        self.overviewLoader = overviewLoader
         self.accountID = accountID
         self.appSession = appSession
         self.onResourceEdited =
@@ -173,6 +181,24 @@ struct GitLabProjectDetailView: View {
                 await starModel.loadIfNeeded(
                     project: loadedProject
                 )
+                await handleAuthenticationFailure()
+            }
+            .task(id: loadedProject?.id) {
+                guard let loadedProject else {
+                    return
+                }
+                let overview =
+                    overviewModel
+                    ?? GitLabProjectOverviewModel(
+                        project: loadedProject,
+                        overviewLoader:
+                            overviewLoader,
+                        commitLoader: commitLoader,
+                        isAccountCurrent:
+                            isAccountCurrent
+                    )
+                overviewModel = overview
+                await overview.loadIfNeeded()
                 await handleAuthenticationFailure()
             }
             .alert(
@@ -252,38 +278,27 @@ struct GitLabProjectDetailView: View {
         ScrollView {
             VStack(
                 alignment: .leading,
-                spacing: 24
+                spacing: 20
             ) {
-                projectHeader(project)
+                GitLabProjectSummaryCard(
+                    project: project
+                )
 
-                GitLabDetailSection(
-                    title: "Overview"
-                ) {
-                    projectOverview(project)
+                if
+                    case let .loaded(languages) =
+                        overviewModel?.languages,
+                    !languages.isEmpty
+                {
+                    GitLabProjectLanguageBar(
+                        languages: languages
+                    )
                 }
 
-                GitLabDetailSection(
-                    title: "Browse"
-                ) {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 10
-                    ) {
-                        projectCodeRow(project)
+                projectActions(project)
 
-                        projectIssuesRow(
-                            project
-                        )
+                projectTiles(project)
 
-                        projectMergeRequestsRow(
-                            project
-                        )
-
-                        projectCommitsRow(
-                            project
-                        )
-                    }
-                }
+                projectCodeSection(project)
 
                 if
                     let readmeRoute =
@@ -299,19 +314,6 @@ struct GitLabProjectDetailView: View {
                     )
                     .id(readmeRoute)
                 }
-
-                if
-                    let destination =
-                        project.safeWebURL
-                {
-                    GitLabOpenInGitLabLink(
-                        destination:
-                            destination,
-                        accessibilityIdentifier:
-                            "project.openInGitLab"
-                    )
-                    .padding(.horizontal, -20)
-                }
             }
             .padding(20)
         }
@@ -321,6 +323,7 @@ struct GitLabProjectDetailView: View {
                 await starModel.refresh(
                     project: loadedProject
                 )
+                await overviewModel?.refresh()
                 await handleAuthenticationFailure()
             }
         }
@@ -349,179 +352,79 @@ struct GitLabProjectDetailView: View {
             .isDisabled != true
     }
 
-    private func projectHeader(
+    private func projectActions(
         _ project: GitLabProject
     ) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            AsyncImage(
-                url: project.safeAvatarURL
-            ) { phase in
-                switch phase {
-                case let .success(image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    Text(project.avatarMark)
-                        .font(
-                            .glabHeadline.weight(
-                                .bold
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 8) {
+                projectStarAction(project)
+
+                if let url = project.safeWebURL {
+                    Button {
+                        UIPasteboard.general.string =
+                            url.appendingPathExtension(
+                                "git"
+                            ).absoluteString
+                        didCopyCloneURL = true
+                        Task {
+                            try? await Task.sleep(
+                                for: .seconds(1.5)
                             )
+                            didCopyCloneURL = false
+                        }
+                    } label: {
+                        GitLabProjectActionItem(
+                            title:
+                                didCopyCloneURL
+                                ? "Copied"
+                                : "Clone",
+                            systemImage:
+                                didCopyCloneURL
+                                ? "checkmark"
+                                : "arrow.down.circle",
+                            tint: .teal
                         )
-                        .foregroundStyle(Color.glabBrandWarm)
-                }
-            }
-            .frame(width: 58, height: 58)
-            .background(
-                Color.glabBrandWarm.opacity(0.12)
-            )
-            .clipShape(
-                .rect(cornerRadius: 14)
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 14
-                )
-                .stroke(
-                    Color.secondary
-                        .opacity(0.18),
-                    lineWidth: 0.5
-                )
-            }
-            .accessibilityHidden(true)
-
-            VStack(
-                alignment: .leading,
-                spacing: 5
-            ) {
-                Text(project.name)
-                    .font(.glabTitle2.bold())
-                Text(
-                    project.pathWithNamespace
-                )
-                .font(.glabSubheadline)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-            }
-        }
-        .accessibilityElement(
-            children: .combine
-        )
-        .accessibilityIdentifier(
-            "project.header"
-        )
-    }
-
-    private func projectOverview(
-        _ project: GitLabProject
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 18) {
-                    projectFact(
-                        title: "Visibility",
-                        value:
-                            project.visibility.title,
-                        systemImage:
-                            project.visibility
-                                .systemImage
+                    }
+                    .accessibilityLabel(
+                        "Copy clone URL"
+                    )
+                    .accessibilityIdentifier(
+                        "project.clone"
                     )
 
-                    Divider()
-                        .frame(height: 42)
-
-                    projectStars(project)
-                }
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 14
-                ) {
-                    projectFact(
-                        title: "Visibility",
-                        value:
-                            project.visibility.title,
-                        systemImage:
-                            project.visibility
-                                .systemImage
+                    ShareLink(item: url) {
+                        GitLabProjectActionItem(
+                            title: "Share",
+                            systemImage:
+                                "square.and.arrow.up",
+                            tint: .indigo
+                        )
+                    }
+                    .accessibilityIdentifier(
+                        "project.share"
                     )
 
-                    projectStars(project)
+                    Link(destination: url) {
+                        GitLabProjectActionItem(
+                            title: "Browser",
+                            systemImage: "safari",
+                            tint: .orange
+                        )
+                    }
+                    .accessibilityIdentifier(
+                        "project.openInGitLab"
+                    )
                 }
             }
-
-            Divider()
-
-            projectFact(
-                title: "Last activity",
-                value:
-                    project.lastActivityAt
-                        .formatted(
-                            date: .abbreviated,
-                            time: .shortened
-                        ),
-                systemImage: "clock"
-            )
         }
-        .padding(16)
-        .background(
-            Color.secondary.opacity(0.07),
-            in: .rect(cornerRadius: 16)
-        )
-        .accessibilityElement(
-            children: .contain
-        )
-    }
-
-    private func projectFact(
-        title: String,
-        value: String,
-        systemImage: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Label(title, systemImage: systemImage)
-                .font(.glabCaption)
-                .foregroundStyle(.secondary)
-
-            Text(value)
-                .font(
-                    .glabSubheadline.weight(.semibold)
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
-        }
-        .frame(
-            maxWidth: .infinity,
-            alignment: .leading
-        )
-        .accessibilityElement(
-            children: .combine
-        )
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
-    private func projectStars(
+    private func projectStarAction(
         _ project: GitLabProject
     ) -> some View {
         if apiAccess.canWrite {
-            projectStarButton(project)
-        } else {
-            projectFact(
-                title: "Stars",
-                value:
-                    project.starCount
-                        .formatted(),
-                systemImage: "star"
-            )
-        }
-    }
-
-    private func projectStarButton(
-        _ project: GitLabProject
-    ) -> some View {
-        HStack(spacing: 7) {
             Button {
                 Task {
                     if starModel.canRetry {
@@ -535,46 +438,8 @@ struct GitLabProjectDetailView: View {
                     }
                 }
             } label: {
-                if starModel.isMutating {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 18, height: 18)
-                } else {
-                    switch starModel.state {
-                    case .idle, .loading:
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 18, height: 18)
-                    case .failed:
-                        Image(
-                            systemName: "arrow.clockwise"
-                        )
-                        .foregroundStyle(.primary)
-                        .frame(width: 18, height: 18)
-                    case let .ready(isStarred):
-                        Image(
-                            systemName:
-                                isStarred
-                                ? "star.fill"
-                                : "star"
-                        )
-                        .foregroundStyle(
-                            isStarred
-                            ? Color.glabBrandWarm
-                            : Color.primary
-                        )
-                        .frame(width: 18, height: 18)
-                    }
-                }
+                starActionItem
             }
-            .font(
-                .glabSubheadline.weight(
-                    .semibold
-                )
-            )
-            .frame(width: 44, height: 44)
-            .buttonBorderShape(.circle)
-            .buttonStyle(.glass(.clear))
             .disabled(
                 !starModel.canToggle
                     && !starModel.canRetry
@@ -597,22 +462,55 @@ struct GitLabProjectDetailView: View {
             .accessibilityIdentifier(
                 "project.starButton"
             )
-
-            Text(
-                project.starCount
-                    .formatted()
+        } else {
+            GitLabProjectActionItem(
+                title:
+                    project.starCount.formatted(),
+                systemImage: "star",
+                tint: .secondary
             )
-            .font(
-                .glabSubheadline.weight(
-                    .semibold
-                )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                "\(project.starCount) stars"
             )
-            .monospacedDigit()
-            .accessibilityHidden(true)
         }
-        .frame(
-            maxWidth: .infinity,
-            alignment: .leading
+    }
+
+    private var starActionItem: some View {
+        let isLoading =
+            starModel.isMutating
+            || {
+                switch starModel.state {
+                case .idle, .loading:
+                    true
+                default:
+                    false
+                }
+            }()
+        let isStarred = starModel.isStarred == true
+        let didFail: Bool = {
+            if case .failed = starModel.state {
+                return true
+            }
+            return false
+        }()
+
+        return GitLabProjectActionItem(
+            title:
+                didFail
+                ? "Retry"
+                : (isStarred ? "Starred" : "Star"),
+            systemImage:
+                didFail
+                ? "arrow.clockwise"
+                : (isStarred
+                    ? "star.fill"
+                    : "star"),
+            tint:
+                isStarred
+                ? Color.glabBrandWarm
+                : Color.glabAccent,
+            isLoading: isLoading
         )
     }
 
@@ -646,210 +544,400 @@ struct GitLabProjectDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private func projectCodeRow(
+    private func projectTiles(
         _ project: GitLabProject
     ) -> some View {
-        NavigationLink {
-            GitLabRepositoryView(
-                project: project,
-                loader: repositoryLoader,
-                accountID: accountID,
-                appSession: appSession
-            )
-        } label: {
-            GitLabProjectDestinationLabel(
-                title: "Code",
-                subtitle:
-                    "Browse files and branches",
-                gitLabIcon: .project
-            )
-        }
-        .buttonStyle(
-            GitLabProjectDestinationButtonStyle()
-        )
-        .accessibilityHint(
-            "Browses files in this project."
-        )
-        .accessibilityIdentifier(
-            "project.code"
-        )
-    }
-
-    @ViewBuilder
-    private func projectIssuesRow(
-        _ project: GitLabProject
-    ) -> some View {
-        if
-            project.issuesAccessLevel?
-                .isDisabled == true
-        {
-            GitLabProjectDestinationLabel(
-                title: "Issues",
-                subtitle:
-                    "Disabled for this project",
-                gitLabIcon:
-                    .workItemIssue,
-                isAvailable: false
-            )
-            .accessibilityIdentifier(
-                "project.issues.disabled"
-            )
-        } else {
-            NavigationLink {
-                GitLabProjectIssuesView(
-                    project: project,
-                    apiAccess: apiAccess,
-                    loader: issueLoader,
-                    discussionLoader:
-                        discussionLoader,
-                    discussionMutator:
-                        discussionMutator,
-                    reactionService:
-                        reactionService,
-                    editService:
-                        editService,
-                    issueStatusService:
-                        issueStatusService,
-                    issueCreationService:
-                        issueCreationService,
-                    accountID: accountID,
-                    appSession: appSession,
-                    onResourceEdited:
-                        onResourceEdited
-                )
-            } label: {
-                GitLabProjectDestinationLabel(
+        GitLabStatTileRow {
+            if
+                project.issuesAccessLevel?
+                    .isDisabled == true
+            {
+                GitLabStatTile(
                     title: "Issues",
-                    subtitle:
-                        "Plan and track project work",
-                    gitLabIcon:
-                        .workItemIssue
+                    tint: .secondary,
+                    value: "Off"
+                ) {
+                    GitLabIconView(
+                        .workItemIssue,
+                        pointSize: 18
+                    )
+                }
+                .opacity(0.6)
+            } else {
+                NavigationLink {
+                    projectIssuesDestination(
+                        project
+                    )
+                } label: {
+                    GitLabStatTile(
+                        title: "Issues",
+                        tint: .glabAccent,
+                        value:
+                            project.openIssuesCount
+                            .map { $0.formatted() }
+                            ?? "–"
+                    ) {
+                        GitLabIconView(
+                            .workItemIssue,
+                            pointSize: 18
+                        )
+                    }
+                }
+                .accessibilityIdentifier(
+                    "project.issues"
                 )
             }
-            .buttonStyle(
-                GitLabProjectDestinationButtonStyle()
-            )
-            .accessibilityHint(
-                "Shows issues in this project."
-            )
+
+            if
+                project.mergeRequestsAccessLevel?
+                    .isDisabled == true
+            {
+                GitLabStatTile(
+                    title: "MRs",
+                    tint: .secondary,
+                    value: "Off"
+                ) {
+                    GitLabIconView(
+                        .mergeRequest,
+                        pointSize: 18
+                    )
+                }
+                .opacity(0.6)
+            } else {
+                NavigationLink {
+                    projectMergeRequestsDestination(
+                        project
+                    )
+                } label: {
+                    GitLabStatTile(
+                        title: "MRs",
+                        tint: .pink,
+                        value: mergeRequestCountText
+                    ) {
+                        GitLabIconView(
+                            .mergeRequest,
+                            pointSize: 18
+                        )
+                    }
+                }
+                .accessibilityIdentifier(
+                    "project.mergeRequests"
+                )
+            }
+
+            NavigationLink {
+                projectPipelinesDestination(
+                    project
+                )
+            } label: {
+                GitLabStatTile(
+                    title: "Pipelines",
+                    tint: latestPipelineTint,
+                    value: latestPipelineText
+                ) {
+                    GitLabIconView(
+                        .pipeline,
+                        pointSize: 18
+                    )
+                }
+            }
             .accessibilityIdentifier(
-                "project.issues"
+                "project.pipelines"
             )
+
+            GitLabStatTile(
+                title: "Activity",
+                tint: .orange,
+                value:
+                    GitLabRelativeTimeFormatter
+                    .string(
+                        from: project.lastActivityAt
+                    )
+            ) {
+                Image(systemName: "clock")
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var mergeRequestCountText: String {
+        if
+            case let .loaded(count) =
+                overviewModel?.openMergeRequestCount,
+            let count
+        {
+            return count.formatted()
+        }
+        return "–"
+    }
+
+    private var latestPipelineText: String {
+        if
+            case let .loaded(pipeline) =
+                overviewModel?.latestPipeline,
+            let pipeline
+        {
+            return pipeline.status.title
+        }
+        return "–"
+    }
+
+    private var latestPipelineTint: Color {
+        if
+            case let .loaded(pipeline) =
+                overviewModel?.latestPipeline,
+            let pipeline
+        {
+            return pipeline.status.tint
+        }
+        return .secondary
+    }
+
+    private func projectCodeSection(
+        _ project: GitLabProject
+    ) -> some View {
+        GitLabDetailSection(title: "Code") {
+            VStack(
+                alignment: .leading,
+                spacing: 12
+            ) {
+                if
+                    let branch =
+                        project.defaultBranch?
+                        .trimmingCharacters(
+                            in:
+                                .whitespacesAndNewlines
+                        ),
+                    !branch.isEmpty
+                {
+                    HStack(spacing: 8) {
+                        GitLabProjectBranchChip(
+                            branch: branch
+                        )
+                        Text("default")
+                            .font(.glabCaption)
+                            .foregroundStyle(
+                                .secondary
+                            )
+                    }
+                }
+
+                projectRecentCommits(project)
+
+                projectLatestPipelineRow(project)
+
+                HStack(spacing: 10) {
+                    NavigationLink {
+                        GitLabRepositoryView(
+                            project: project,
+                            loader:
+                                repositoryLoader,
+                            accountID: accountID,
+                            appSession: appSession
+                        )
+                    } label: {
+                        codeButtonLabel(
+                            "Files",
+                            systemImage: "folder"
+                        )
+                    }
+                    .accessibilityIdentifier(
+                        "project.code"
+                    )
+
+                    NavigationLink {
+                        GitLabProjectCommitsView(
+                            project: project,
+                            loader: commitLoader,
+                            accountID: accountID,
+                            appSession: appSession
+                        )
+                    } label: {
+                        codeButtonLabel(
+                            "History",
+                            systemImage:
+                                "clock.arrow.circlepath"
+                        )
+                    }
+                    .accessibilityIdentifier(
+                        "project.commits"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
     @ViewBuilder
-    private func projectMergeRequestsRow(
+    private func projectRecentCommits(
+        _ project: GitLabProject
+    ) -> some View {
+        switch overviewModel?.commits {
+        case let .loaded(commits)
+        where !commits.isEmpty:
+            VStack(spacing: 12) {
+                ForEach(commits) { commit in
+                    NavigationLink {
+                        GitLabCommitDetailView(
+                            project: project,
+                            commit: commit,
+                            loader: commitLoader,
+                            accountID: accountID,
+                            appSession: appSession
+                        )
+                    } label: {
+                        GitLabProjectCommitRow(
+                            commit: commit
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier(
+                        "project.commit.\(commit.shortID)"
+                    )
+                }
+            }
+        case .loaded:
+            Text("No commits yet")
+                .font(.glabSubheadline)
+                .foregroundStyle(.secondary)
+        case .failed:
+            Text("Couldn’t load commits")
+                .font(.glabSubheadline)
+                .foregroundStyle(.secondary)
+        case .loading, nil:
+            ProgressView()
+                .controlSize(.small)
+        }
+    }
+
+    @ViewBuilder
+    private func projectLatestPipelineRow(
         _ project: GitLabProject
     ) -> some View {
         if
-            project.mergeRequestsAccessLevel?
-                .isDisabled == true
+            case let .loaded(pipeline?) =
+                overviewModel?.latestPipeline,
+            let route = GitLabPipelineRoute(
+                projectID: project.id,
+                pipelineID: pipeline.id
+            )
         {
-            GitLabProjectDestinationLabel(
-                title: "Merge Requests",
-                subtitle:
-                    "Disabled for this project",
-                gitLabIcon:
-                    .mergeRequest,
-                isAvailable: false
-            )
-            .accessibilityIdentifier(
-                "project.mergeRequests.disabled"
-            )
-        } else {
             NavigationLink {
-                GitLabProjectMergeRequestsView(
-                    project: project,
-                    loader:
-                        mergeRequestLoader,
-                    approvalService:
-                        mergeRequestApprovalService,
-                    mergeService:
-                        mergeRequestMergeService,
-                    pipelineLoader:
-                        pipelineLoader,
-                    discussionLoader:
-                        discussionLoader,
-                    discussionMutator:
-                        discussionMutator,
-                    reactionService:
-                        reactionService,
-                    editService:
-                        editService,
+                GitLabPipelineDetailView(
+                    route: route,
+                    cacheLifetime:
+                        pipeline
+                        .detailCacheLifetime,
+                    loader: pipelineLoader,
                     accountID: accountID,
                     appSession: appSession,
-                    onResourceEdited:
-                        onResourceEdited
+                    apiAccess: apiAccess,
+                    isAccountCurrent:
+                        isAccountCurrent
                 )
             } label: {
-                GitLabProjectDestinationLabel(
-                    title: "Merge Requests",
-                    subtitle:
-                        "Review proposed changes",
-                    gitLabIcon:
-                        .mergeRequest
+                GitLabPipelineHistoryRow(
+                    pipeline: pipeline
+                )
+                .padding(10)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
+                .background(
+                    Color.secondary.opacity(0.075),
+                    in: .rect(cornerRadius: 14)
                 )
             }
-            .buttonStyle(
-                GitLabProjectDestinationButtonStyle()
-            )
-            .accessibilityHint(
-                "Shows merge requests in this project."
-            )
+            .buttonStyle(.plain)
             .accessibilityIdentifier(
-                "project.mergeRequests"
+                "project.latestPipeline"
             )
         }
     }
 
-    private func projectCommitsRow(
+    private func codeButtonLabel(
+        _ title: String,
+        systemImage: String
+    ) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(
+                .glabSubheadline.weight(.semibold)
+            )
+            .foregroundStyle(Color.glabAccent)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .glassEffect(
+                .regular
+                    .tint(
+                        Color.glabAccent.opacity(0.12)
+                    )
+                    .interactive(),
+                in: .rect(cornerRadius: 14)
+            )
+            .contentShape(.rect(cornerRadius: 14))
+    }
+
+    private func projectIssuesDestination(
         _ project: GitLabProject
     ) -> some View {
-        NavigationLink {
-            GitLabProjectCommitsView(
-                project: project,
-                loader: commitLoader,
-                accountID: accountID,
-                appSession: appSession
-            )
-        } label: {
-            GitLabProjectDestinationLabel(
-                title: "Commits",
-                subtitle:
-                    "History on "
-                    + defaultBranchTitle(project),
-                gitLabIcon:
-                    .commit
-            )
-        }
-        .buttonStyle(
-            GitLabProjectDestinationButtonStyle()
-        )
-        .accessibilityHint(
-            "Shows commits on the default branch."
-        )
-        .accessibilityIdentifier(
-            "project.commits"
+        GitLabProjectIssuesView(
+            project: project,
+            apiAccess: apiAccess,
+            loader: issueLoader,
+            discussionLoader: discussionLoader,
+            discussionMutator: discussionMutator,
+            reactionService: reactionService,
+            editService: editService,
+            issueStatusService: issueStatusService,
+            issueCreationService:
+                issueCreationService,
+            accountID: accountID,
+            appSession: appSession,
+            onResourceEdited: onResourceEdited
         )
     }
 
-    private func defaultBranchTitle(
+    private func projectMergeRequestsDestination(
         _ project: GitLabProject
-    ) -> String {
-        guard
-            let branch =
-                project.defaultBranch?
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                ),
-            !branch.isEmpty
-        else {
-            return "the default branch"
+    ) -> some View {
+        GitLabProjectMergeRequestsView(
+            project: project,
+            loader: mergeRequestLoader,
+            approvalService:
+                mergeRequestApprovalService,
+            mergeService: mergeRequestMergeService,
+            pipelineLoader: pipelineLoader,
+            discussionLoader: discussionLoader,
+            discussionMutator: discussionMutator,
+            reactionService: reactionService,
+            editService: editService,
+            accountID: accountID,
+            appSession: appSession,
+            onResourceEdited: onResourceEdited
+        )
+    }
+
+    private func projectPipelinesDestination(
+        _ project: GitLabProject
+    ) -> some View {
+        GitLabProjectPipelinesView(
+            project: project,
+            overviewLoader: overviewLoader,
+            pipelineLoader: pipelineLoader,
+            accountID: accountID,
+            appSession: appSession,
+            apiAccess: apiAccess,
+            isAccountCurrent: isAccountCurrent
+        )
+    }
+
+    private var isAccountCurrent:
+        @MainActor () -> Bool
+    {
+        { [appSession, accountID] in
+            appSession.activeAccountID == accountID
         }
-        return branch
     }
 
     private var createdIssueIsPresented:
@@ -966,6 +1054,8 @@ struct GitLabProjectDetailView: View {
             let error =
                 model.authenticationFailure
                 ?? starModel
+                    .authenticationFailure
+                ?? overviewModel?
                     .authenticationFailure
         else {
             return
@@ -1208,125 +1298,6 @@ private struct GitLabProjectReadmeView: View {
             .handleAuthenticationFailure(
                 error,
                 for: accountID
-            )
-    }
-}
-
-private struct GitLabProjectDestinationLabel:
-    View
-{
-    let title: String
-    let subtitle: String
-    let gitLabIcon: GitLabIcon
-    var isAvailable = true
-
-    var body: some View {
-        HStack(spacing: 12) {
-            GitLabIconView(gitLabIcon)
-                .foregroundStyle(
-                    isAvailable
-                        ? Color.glabAccent
-                        : Color.secondary
-                )
-                .frame(width: 40, height: 40)
-                .background(
-                    (
-                        isAvailable
-                            ? Color.glabAccent
-                            : Color.secondary
-                    )
-                    .opacity(
-                        isAvailable ? 0.14 : 0.08
-                    ),
-                    in: .rect(cornerRadius: 11)
-                )
-                .accessibilityHidden(true)
-
-            VStack(
-                alignment: .leading,
-                spacing: 3
-            ) {
-                Text(title)
-                    .font(
-                        .glabBody.weight(.semibold)
-                    )
-                    .foregroundStyle(.primary)
-
-                Text(subtitle)
-                    .font(.glabCaption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 8)
-
-            if isAvailable {
-                Image(systemName: "chevron.forward")
-                    .font(
-                        .glabCaption.weight(.bold)
-                    )
-                    .foregroundStyle(.secondary)
-                    .frame(width: 30, height: 30)
-                    .background(
-                        Color.secondary.opacity(0.1),
-                        in: .circle
-                    )
-                    .accessibilityHidden(true)
-            } else {
-                Text("Unavailable")
-                    .font(
-                        .glabCaption.weight(.medium)
-                    )
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(12)
-        .frame(
-            maxWidth: .infinity,
-            minHeight: 64,
-            alignment: .leading
-        )
-        .background(
-            Color.secondary.opacity(
-                isAvailable ? 0.075 : 0.04
-            ),
-            in: .rect(cornerRadius: 16)
-        )
-        .contentShape(.rect)
-        .opacity(isAvailable ? 1 : 0.68)
-        .accessibilityElement(
-            children: .combine
-        )
-    }
-}
-
-private struct GitLabProjectDestinationButtonStyle:
-    ButtonStyle
-{
-    @Environment(\.accessibilityReduceMotion)
-    private var reduceMotion
-
-    func makeBody(
-        configuration: Configuration
-    ) -> some View {
-        configuration.label
-            .opacity(
-                configuration.isPressed
-                    ? 0.72
-                    : 1
-            )
-            .scaleEffect(
-                configuration.isPressed
-                    && !reduceMotion
-                    ? 0.985
-                    : 1
-            )
-            .animation(
-                reduceMotion
-                    ? nil
-                    : .easeOut(duration: 0.12),
-                value:
-                    configuration.isPressed
             )
     }
 }
