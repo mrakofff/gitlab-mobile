@@ -23,14 +23,14 @@ struct GitLabTerminalSanitizerTests {
     func stripsOSCSequences() {
         let source =
             Data(
-                (
-                    "\u{1B}]8;;https://host.invalid/private\u{7}"
-                        + "Open"
-                        + "\u{1B}]8;;\u{7}"
-                        + "\u{1B}]52;c;c2VjcmV0\u{7}"
-                        + "\u{1B}]0;private title\u{7}"
-                        + " safe"
-                ).utf8
+                [
+                    "\u{1B}]8;;https://host.invalid/private\u{7}",
+                    "Open",
+                    "\u{1B}]8;;\u{7}",
+                    "\u{1B}]52;c;c2VjcmV0\u{7}",
+                    "\u{1B}]0;private title\u{7}",
+                    " safe",
+                ].joined().utf8
             )
 
         #expect(
@@ -44,14 +44,14 @@ struct GitLabTerminalSanitizerTests {
     func stripsStringControlSequences() {
         let source =
             Data(
-                (
-                    "a"
-                        + "\u{1B}Pprivate\u{1B}\\"
-                        + "\u{1B}_command\u{1B}\\"
-                        + "\u{1B}^message\u{1B}\\"
-                        + "\u{1B}Xpayload\u{1B}\\"
-                        + "b"
-                ).utf8
+                [
+                    "a",
+                    "\u{1B}Pprivate\u{1B}\\",
+                    "\u{1B}_command\u{1B}\\",
+                    "\u{1B}^message\u{1B}\\",
+                    "\u{1B}Xpayload\u{1B}\\",
+                    "b",
+                ].joined().utf8
             )
 
         #expect(

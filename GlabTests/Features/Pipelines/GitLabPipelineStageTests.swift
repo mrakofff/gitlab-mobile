@@ -4,7 +4,7 @@ import Testing
 
 @Suite("GitLab pipeline stage projection")
 struct GitLabPipelineStageTests {
-    @Test("Preserves stage and server order while labeling attempts")
+    @Test("Orders stages by creation and keeps server row order while labeling attempts")
     func projectsStableStages() async throws {
         let jobs = try [
             job(
@@ -28,7 +28,7 @@ struct GitLabPipelineStageTests {
         ]
         let triggers = try [
             trigger(
-                id: 700,
+                id: 950,
                 name: "mobile child",
                 stage: "deploy"
             ),
@@ -64,7 +64,7 @@ struct GitLabPipelineStageTests {
         )
         #expect(
             stages[1].rows.map(\.id)
-                == [.triggerJob(700)]
+                == [.triggerJob(950)]
         )
         #expect(
             stages[1].rows[0].attempt
