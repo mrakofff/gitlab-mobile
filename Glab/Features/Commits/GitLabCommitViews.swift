@@ -151,7 +151,7 @@ struct GitLabProjectCommitsView: View {
             ) { commit in
                 NavigationLink {
                     GitLabCommitDetailView(
-                        project: project,
+                        projectID: project.id,
                         commit: commit,
                         loader: loader,
                         accountID: accountID,
@@ -375,7 +375,7 @@ private enum GitLabCommitDetailSection:
 }
 
 struct GitLabCommitDetailView: View {
-    let project: GitLabProject
+    let projectID: Int
     let commit: GitLabCommit
     let accountID: GitLabAccountID
     let appSession: AppSession
@@ -389,13 +389,13 @@ struct GitLabCommitDetailView: View {
         GitLabCommitDiffModel
 
     init(
-        project: GitLabProject,
+        projectID: Int,
         commit: GitLabCommit,
         loader: any GitLabCommitLoading,
         accountID: GitLabAccountID,
         appSession: AppSession
     ) {
-        self.project = project
+        self.projectID = projectID
         self.commit = commit
         self.accountID = accountID
         self.appSession = appSession
@@ -405,7 +405,7 @@ struct GitLabCommitDetailView: View {
                     route:
                         GitLabCommitDiffRoute(
                             projectID:
-                                project.id,
+                                projectID,
                             commitSHA:
                                 commit.id
                         ),
@@ -616,7 +616,7 @@ struct GitLabCommitDetailView: View {
                     NavigationLink {
                         GitLabCommitFileDiffView(
                             projectID:
-                                project.id,
+                                projectID,
                             commit: commit,
                             file: file,
                             accountID:

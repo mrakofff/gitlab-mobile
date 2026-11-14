@@ -4,6 +4,8 @@ import UIKit
 struct GitLabRepositoryView: View {
     let project: GitLabProject
     let loader: any GitLabRepositoryLoading
+    let commitLoader: any GitLabCommitLoading
+    let apiAccess: GitLabAPIAccess
     let accountID: GitLabAccountID
     let appSession: AppSession
 
@@ -14,11 +16,15 @@ struct GitLabRepositoryView: View {
     init(
         project: GitLabProject,
         loader: any GitLabRepositoryLoading,
+        commitLoader: any GitLabCommitLoading,
+        apiAccess: GitLabAPIAccess,
         accountID: GitLabAccountID,
         appSession: AppSession
     ) {
         self.project = project
         self.loader = loader
+        self.commitLoader = commitLoader
+        self.apiAccess = apiAccess
         self.accountID = accountID
         self.appSession = appSession
         _selectedRef = State(
@@ -34,6 +40,8 @@ struct GitLabRepositoryView: View {
             path: "",
             isRoot: true,
             loader: loader,
+            commitLoader: commitLoader,
+            apiAccess: apiAccess,
             accountID: accountID,
             appSession: appSession
         ) {
@@ -70,6 +78,8 @@ private struct GitLabRepositoryDirectoryView:
     let path: String
     let isRoot: Bool
     let loader: any GitLabRepositoryLoading
+    let commitLoader: any GitLabCommitLoading
+    let apiAccess: GitLabAPIAccess
     let accountID: GitLabAccountID
     let appSession: AppSession
     let changeBranch: () -> Void
@@ -78,6 +88,8 @@ private struct GitLabRepositoryDirectoryView:
         GitLabRepositoryDirectoryModel
     @State private var searchModel:
         GitLabRepositorySearchModel
+    @State private var lastCommitModel:
+        GitLabRepositoryLastCommitModel
     @State private var searchText = ""
 
     init(
@@ -86,6 +98,8 @@ private struct GitLabRepositoryDirectoryView:
         path: String,
         isRoot: Bool,
         loader: any GitLabRepositoryLoading,
+        commitLoader: any GitLabCommitLoading,
+        apiAccess: GitLabAPIAccess,
         accountID: GitLabAccountID,
         appSession: AppSession,
         changeBranch: @escaping () -> Void
@@ -95,6 +109,8 @@ private struct GitLabRepositoryDirectoryView:
         self.path = path
         self.isRoot = isRoot
         self.loader = loader
+        self.commitLoader = commitLoader
+        self.apiAccess = apiAccess
         self.accountID = accountID
         self.appSession = appSession
         self.changeBranch = changeBranch
@@ -113,6 +129,14 @@ private struct GitLabRepositoryDirectoryView:
                     projectID: project.id,
                     ref: ref,
                     loader: loader
+                )
+        )
+        _lastCommitModel = State(
+            initialValue:
+                GitLabRepositoryLastCommitModel(
+                    projectID: project.id,
+                    ref: ref,
+                    loader: commitLoader
                 )
         )
     }
@@ -177,6 +201,10 @@ private struct GitLabRepositoryDirectoryView:
             }
             .task {
                 await model.loadIfNeeded()
+                if isRoot {
+                    await lastCommitModel
+                        .loadIfNeeded()
+                }
                 await handleAuthenticationFailure()
             }
             .task(id: searchText) {
@@ -237,6 +265,37 @@ private struct GitLabRepositoryDirectoryView:
         }
     }
 
+    @ViewBuilder
+    private var lastCommitCard: some View {
+        if
+            case let .loaded(
+                commit,
+                count: _
+            ) = lastCommitModel.state
+        {
+            Section {
+                NavigationLink {
+                    GitLabFileHistoryView(
+                        projectID: project.id,
+                        path: nil,
+                        ref: ref,
+                        loader: commitLoader,
+                        accountID: accountID,
+                        appSession: appSession
+                    )
+                } label: {
+                    GitLabProjectCommitRow(
+                        commit: commit
+                    )
+                    .padding(.vertical, 2)
+                }
+                .listRowBackground(
+                    Color.glabRaisedSurface
+                )
+            }
+        }
+    }
+
     private var directoryList: some View {
         GlabList {
             if
@@ -254,6 +313,10 @@ private struct GitLabRepositoryDirectoryView:
                         await handleAuthenticationFailure()
                     }
                 }
+            }
+
+            if isRoot {
+                lastCommitCard
             }
 
             ForEach(model.sortedRepositoryEntries) {
@@ -288,6 +351,8 @@ private struct GitLabRepositoryDirectoryView:
                     path: entry.path,
                     isRoot: false,
                     loader: loader,
+                    commitLoader: commitLoader,
+                    apiAccess: apiAccess,
                     accountID: accountID,
                     appSession: appSession,
                     changeBranch: changeBranch
@@ -474,6 +539,8 @@ private struct GitLabRepositoryDirectoryView:
                 blobID: blobID
             ),
             loader: loader,
+            commitLoader: commitLoader,
+            apiAccess: apiAccess,
             accountID: accountID,
             appSession: appSession
         )
@@ -872,6 +939,9 @@ private struct GitLabRepositoryBranchPickerView:
 
 struct GitLabRepositoryFileView: View {
     let route: GitLabRepositoryFileRoute
+    let loader: any GitLabRepositoryLoading
+    let commitLoader: any GitLabCommitLoading
+    let apiAccess: GitLabAPIAccess
     let accountID: GitLabAccountID
     let appSession: AppSession
 
@@ -881,10 +951,20 @@ struct GitLabRepositoryFileView: View {
         GitLabRepositoryFileModel
     @State private var presentation:
         GitLabRepositoryFilePresentation
+    @State private var isBlamePresented = false
+    @State private var isDeleteConfirmationPresented =
+        false
+    @State private var isDeleting = false
+    @State private var deleteError:
+        GitLabSessionClientError?
+    @State private var latestCommitID: String?
+    @Environment(\.dismiss) private var dismiss
 
     init(
         route: GitLabRepositoryFileRoute,
-        loader: any GitLabRepositorySourceLoading,
+        loader: any GitLabRepositoryLoading,
+        commitLoader: any GitLabCommitLoading,
+        apiAccess: GitLabAPIAccess,
         accountID: GitLabAccountID,
         appSession: AppSession,
         initialPresentation:
@@ -892,6 +972,9 @@ struct GitLabRepositoryFileView: View {
                 .rendered
     ) {
         self.route = route
+        self.loader = loader
+        self.commitLoader = commitLoader
+        self.apiAccess = apiAccess
         self.accountID = accountID
         self.appSession = appSession
         _presentation = State(
@@ -934,25 +1017,8 @@ struct GitLabRepositoryFileView: View {
                 ToolbarItemGroup(
                     placement: .topBarTrailing
                 ) {
-                    if let destination = route.safeWebURL {
-                        Link(destination: destination) {
-                            GitLabLogoMark()
-                        }
-                        .accessibilityLabel(
-                            "Open file in GitLab"
-                        )
-                    }
-
                     Menu {
-                        Button {
-                            UIPasteboard.general.string =
-                                route.path
-                        } label: {
-                            Label(
-                                "Copy Path",
-                                systemImage: "doc.on.doc"
-                            )
-                        }
+                        copyMenuItems
 
                         if
                             case let .loaded(document) =
@@ -986,15 +1052,75 @@ struct GitLabRepositoryFileView: View {
                                 )
                             }
                         }
+
+                        Divider()
+
+                        openInBrowserMenuItem
+                        deleteFileMenuItem
                     } label: {
                         Image(systemName: "ellipsis")
                     }
                     .accessibilityLabel("File actions")
+
+                    if let destination = route.safeWebURL {
+                        Link(destination: destination) {
+                            GitLabLogoMark()
+                        }
+                        .accessibilityLabel(
+                            "Open file in GitLab"
+                        )
+                    }
                 }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if
+                    case let .loaded(document) =
+                        model.state
+                {
+                    fileActionRow(document)
+                }
+            }
+            .sheet(isPresented: $isBlamePresented) {
+                GitLabBlameSheetView(
+                    route: route,
+                    loader: loader,
+                    accountID: accountID,
+                    appSession: appSession
+                )
+            }
+            .alert(
+                "Delete file?",
+                isPresented:
+                    $isDeleteConfirmationPresented
+            ) {
+                Button(
+                    "Delete",
+                    role: .destructive
+                ) {
+                    Task {
+                        await deleteFile()
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(
+                    "\(route.fileName) will be deleted from \(route.ref) in a new commit."
+                )
+            }
+            .alert(
+                "Couldn’t delete file",
+                isPresented:
+                    Binding(
+                        get: { deleteError != nil },
+                        set: { _ in deleteError = nil }
+                    )
+            ) {} message: {
+                Text(deleteError?.description ?? "")
             }
             .task {
                 await model.loadIfNeeded()
                 await handleAuthenticationFailure()
+                await loadLatestCommitID()
             }
             .onChange(
                 of: model.authenticationFailure
@@ -1013,6 +1139,137 @@ struct GitLabRepositoryFileView: View {
             .accessibilityIdentifier(
                 "repository.file"
             )
+    }
+
+    private func loadLatestCommitID() async {
+        guard route.blobID == nil else {
+            return
+        }
+        do {
+            let page = try await commitLoader
+                .loadCommitsPage(
+                    projectID: route.projectID,
+                    refName: route.ref,
+                    path: nil,
+                    all: false,
+                    after: nil
+                )
+            latestCommitID = page.commits.first?
+                .id
+        } catch {
+            // Permalink falls back to being hidden.
+        }
+    }
+
+    @ViewBuilder
+    private var copyMenuItems: some View {
+        Button {
+            UIPasteboard.general.string =
+                route.path
+        } label: {
+            Label(
+                "Copy Path",
+                systemImage: "doc.on.doc"
+            )
+        }
+
+        if let link = route.safeWebURL {
+            Button {
+                UIPasteboard.general.string =
+                    link.absoluteString
+            } label: {
+                Label(
+                    "Copy Link",
+                    systemImage: "link"
+                )
+            }
+        }
+
+        if
+            let commitID = permalinkCommitID,
+            let link = permalink(
+                commitID: commitID
+            )
+        {
+            Button {
+                UIPasteboard.general.string =
+                    link.absoluteString
+            } label: {
+                Label(
+                    "Copy Permalink",
+                    systemImage: "link.badge.plus"
+                )
+            }
+        }
+    }
+
+    private var permalinkCommitID: String? {
+        route.blobID ?? latestCommitID
+    }
+
+    @ViewBuilder
+    private var openInBrowserMenuItem: some View {
+        if let destination = route.safeWebURL {
+            Link(destination: destination) {
+                Label(
+                    "Open in Browser",
+                    systemImage: "safari"
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var deleteFileMenuItem: some View {
+        if apiAccess.canWrite {
+            Button(
+                role: .destructive
+            ) {
+                isDeleteConfirmationPresented =
+                    true
+            } label: {
+                Label(
+                    "Delete file",
+                    systemImage: "trash"
+                )
+            }
+            .disabled(isDeleting)
+        }
+    }
+
+    private func permalink(
+        commitID: String
+    ) -> URL? {
+        guard
+            let projectWebURL = GitLabWebURL
+                .validated(route.projectWebURL)
+        else {
+            return nil
+        }
+        return projectWebURL
+            .appending(path: "-")
+            .appending(path: "blob")
+            .appending(path: commitID)
+            .appending(path: route.path)
+    }
+
+    private func deleteFile() async {
+        isDeleting = true
+        defer {
+            isDeleting = false
+        }
+        do throws(GitLabSessionClientError) {
+            _ = try await loader.deleteFile(
+                projectID: route.projectID,
+                ref: route.ref,
+                path: route.path,
+                commitMessage:
+                    "Delete \(route.fileName)"
+            )
+            dismiss()
+        } catch {
+            deleteError = error
+        }
     }
 
     @ViewBuilder
@@ -1144,6 +1401,120 @@ struct GitLabRepositoryFileView: View {
                 systemImage: "info.circle"
             )
         }
+    }
+
+    private func fileActionRow(
+        _ document: GitLabSourceDocument
+    ) -> some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Text(
+                    document.language
+                        .displayTitle
+                )
+                    .font(
+                        .glabCaption2.weight(.semibold)
+                    )
+                    .foregroundStyle(.secondary)
+
+                Text("·")
+                    .font(.glabCaption2)
+                    .foregroundStyle(.tertiary)
+
+                Text(
+                    document.lineCount
+                        .formatted()
+                        + " lines"
+                )
+                    .font(.glabCaption2)
+                    .foregroundStyle(.secondary)
+
+                Text("·")
+                    .font(.glabCaption2)
+                    .foregroundStyle(.tertiary)
+
+                Text(byteCountLabel(document))
+                    .font(.glabCaption2)
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            fileActionButton(
+                "Copy",
+                systemImage: "doc.on.doc"
+            ) {
+                UIPasteboard.general.string =
+                    document.source
+            }
+
+            fileActionButton(
+                "Blame",
+                systemImage:
+                    "number.square"
+            ) {
+                isBlamePresented = true
+            }
+
+            NavigationLink {
+                GitLabFileHistoryView(
+                    projectID: route.projectID,
+                    path: route.path,
+                    ref: route.ref,
+                    loader: commitLoader,
+                    accountID: accountID,
+                    appSession: appSession
+                )
+            } label: {
+                Image(
+                    systemName:
+                        "clock.arrow.circlepath"
+                )
+                .font(.glabSubheadline)
+                .accessibilityLabel("History")
+            }
+
+            ShareLink(
+                item: document.source,
+                subject: Text(route.fileName)
+            ) {
+                Image(
+                    systemName:
+                        "square.and.arrow.up"
+                )
+                .font(.glabSubheadline)
+            }
+            .accessibilityLabel("Share contents")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            Color.glabRaisedSurface
+        )
+    }
+
+    private func fileActionButton(
+        _ label: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.glabSubheadline)
+        }
+        .accessibilityLabel(label)
+    }
+
+    private func byteCountLabel(
+        _ document: GitLabSourceDocument
+    ) -> String {
+        ByteCountFormatter.string(
+            fromByteCount: Int64(
+                document.source.utf8.count
+            ),
+            countStyle: .file
+        )
     }
 
     private var fileSubtitle: String {

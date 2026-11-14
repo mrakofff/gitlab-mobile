@@ -203,6 +203,53 @@ struct GitLabRepositoryTests {
         #expect(model.items.count == 101)
     }
 
+    @Test("Decodes blame ranges with their commit and lines")
+    func decodesBlameRanges() throws {
+        let data = Data(
+            """
+            [
+              {
+                "commit": {
+                  "id": "c856e4e1a1b2c3d4e5f60718293a4b5c6d7e8f90",
+                  "short_id": "c856e4e1",
+                  "title": "Add blame layout",
+                  "author_name": "Andrei Mrakoff",
+                  "author_email": "andrei@example.com",
+                  "authored_date": "2026-11-01T10:00:00Z",
+                  "committer_name": "Andrei Mrakoff",
+                  "committer_email": "andrei@example.com",
+                  "committed_date": "2026-11-01T10:00:00Z",
+                  "message": "Add blame layout",
+                  "parent_ids": []
+                },
+                "lines": [
+                  "import Foundation",
+                  "struct Example {}"
+                ]
+              }
+            ]
+            """.utf8
+        )
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let ranges = try decoder.decode(
+            [GitLabBlameRange].self,
+            from: data
+        )
+
+        #expect(ranges.count == 1)
+        #expect(
+            ranges[0].commit.shortID == "c856e4e1"
+        )
+        #expect(
+            ranges[0].commit.authorName == "Andrei Mrakoff"
+        )
+        #expect(ranges[0].lines.count == 2)
+        #expect(ranges[0].lines[1] == "struct Example {}")
+    }
+
     @Test("Builds a repository route from the project README URL")
     func buildsReadmeRoute() throws {
         let route = try #require(
@@ -379,6 +426,16 @@ private nonisolated struct RepositoryBranchLoaderStub:
         after nextPageURL: URL?
     ) async throws(GitLabSessionClientError)
         -> GitLabRepositorySearchPage
+    {
+        throw .api(.notFound)
+    }
+
+    func loadBlame(
+        projectID: Int,
+        ref: String,
+        path: String
+    ) async throws(GitLabSessionClientError)
+        -> [GitLabBlameRange]
     {
         throw .api(.notFound)
     }

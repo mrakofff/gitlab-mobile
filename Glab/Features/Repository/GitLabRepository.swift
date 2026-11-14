@@ -89,6 +89,40 @@ nonisolated struct GitLabRepositoryEntryPage:
     let nextPageURL: URL?
 }
 
+nonisolated struct GitLabBlameRange:
+    Decodable,
+    Equatable,
+    Sendable
+{
+    let commit: GitLabCommit
+    let lines: [String]
+
+    private enum CodingKeys:
+        String,
+        CodingKey
+    {
+        case commit
+        case lines
+    }
+}
+
+nonisolated struct GitLabRepositoryFileCommitResponse:
+    Decodable,
+    Equatable,
+    Sendable
+{
+    let filePath: String
+    let branchName: String
+
+    private enum CodingKeys:
+        String,
+        CodingKey
+    {
+        case filePath = "file_path"
+        case branchName = "branch_name"
+    }
+}
+
 nonisolated struct GitLabRepositoryBranch:
     Decodable,
     Equatable,

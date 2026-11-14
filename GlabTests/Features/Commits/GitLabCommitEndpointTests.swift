@@ -42,6 +42,47 @@ struct GitLabCommitEndpointTests {
         )
     }
 
+    @Test("Scopes commit history to a file path")
+    func buildsFilePathHistoryRequest()
+        throws
+    {
+        let url = try requestURL(
+            GitLabCommitEndpoints.commits(
+                projectID: 42,
+                refName: "main",
+                path: "Sources/App.swift"
+            )
+        )
+
+        #expect(
+            url.absoluteString
+                == "https://gitlab.example.com/api/v4/"
+                + "projects/42/repository/commits"
+                + "?per_page=20&ref_name=main"
+                + "&path=Sources/App.swift"
+        )
+    }
+
+    @Test("Includes every branch when requested")
+    func buildsAllBranchesHistoryRequest()
+        throws
+    {
+        let url = try requestURL(
+            GitLabCommitEndpoints.commits(
+                projectID: 42,
+                refName: "main",
+                all: true
+            )
+        )
+
+        #expect(
+            url.absoluteString
+                == "https://gitlab.example.com/api/v4/"
+                + "projects/42/repository/commits"
+                + "?per_page=20&ref_name=main&all=true"
+        )
+    }
+
     @Test("Builds a commit diff request")
     func buildsDiffRequest() throws {
         let endpoint =
