@@ -107,6 +107,49 @@ nonisolated enum GitLabProjectOverviewEndpoints {
             ]
         )
     }
+
+    fileprivate static func branches(
+        projectID: Int
+    ) -> GitLabAPIRequest<
+        [GitLabProjectCountedItem]
+    > {
+        .get(
+            requires: .read,
+            path: [
+                "projects",
+                String(projectID),
+                "repository",
+                "branches",
+            ],
+            query: [
+                .init(
+                    name: "per_page",
+                    value: "1"
+                ),
+            ]
+        )
+    }
+
+    fileprivate static func releases(
+        projectID: Int
+    ) -> GitLabAPIRequest<
+        [GitLabProjectCountedItem]
+    > {
+        .get(
+            requires: .read,
+            path: [
+                "projects",
+                String(projectID),
+                "releases",
+            ],
+            query: [
+                .init(
+                    name: "per_page",
+                    value: "1"
+                ),
+            ]
+        )
+    }
 }
 
 nonisolated protocol GitLabProjectOverviewLoading:
@@ -118,6 +161,16 @@ nonisolated protocol GitLabProjectOverviewLoading:
         -> [GitLabProjectLanguage]
 
     func loadOpenMergeRequestCount(
+        projectID: Int
+    ) async throws(GitLabSessionClientError)
+        -> Int?
+
+    func loadBranchCount(
+        projectID: Int
+    ) async throws(GitLabSessionClientError)
+        -> Int?
+
+    func loadReleaseCount(
         projectID: Int
     ) async throws(GitLabSessionClientError)
         -> Int?
@@ -173,6 +226,46 @@ nonisolated struct LiveGitLabProjectOverviewLoader:
                     .openMergeRequests(
                         projectID: projectID
                     )
+            )
+        )
+        if let total = response.metadata.totalCount {
+            return total
+        }
+        return response.metadata.nextPageURL == nil
+            ? response.value.count
+            : nil
+    }
+
+    @concurrent
+    func loadBranchCount(
+        projectID: Int
+    ) async throws(GitLabSessionClientError)
+        -> Int?
+    {
+        let response = try await client.sendPage(
+            .initial(
+                GitLabProjectOverviewEndpoints
+                    .branches(projectID: projectID)
+            )
+        )
+        if let total = response.metadata.totalCount {
+            return total
+        }
+        return response.metadata.nextPageURL == nil
+            ? response.value.count
+            : nil
+    }
+
+    @concurrent
+    func loadReleaseCount(
+        projectID: Int
+    ) async throws(GitLabSessionClientError)
+        -> Int?
+    {
+        let response = try await client.sendPage(
+            .initial(
+                GitLabProjectOverviewEndpoints
+                    .releases(projectID: projectID)
             )
         )
         if let total = response.metadata.totalCount {

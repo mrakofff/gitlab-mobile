@@ -363,6 +363,15 @@ private nonisolated struct RepositoryBranchLoaderStub:
         return defaultBranch
     }
 
+    func loadTagsPage(
+        projectID: Int,
+        after nextPageURL: URL?
+    ) async throws(GitLabSessionClientError)
+        -> GitLabRepositoryTagPage
+    {
+        throw .api(.notFound)
+    }
+
     func loadSearchPage(
         projectID: Int,
         ref: String,

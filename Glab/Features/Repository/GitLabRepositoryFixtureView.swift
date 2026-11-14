@@ -143,6 +143,21 @@
             return branch
         }
 
+        func loadTagsPage(
+            projectID: Int,
+            after nextPageURL: URL?
+        ) async throws(GitLabSessionClientError)
+            -> GitLabRepositoryTagPage
+        {
+            guard projectID == Self.project.id else {
+                throw .api(.notFound)
+            }
+            return GitLabRepositoryTagPage(
+                tags: nextPageURL == nil ? [] : [],
+                nextPageURL: nil
+            )
+        }
+
         func loadSearchPage(
             projectID: Int,
             ref: String,
