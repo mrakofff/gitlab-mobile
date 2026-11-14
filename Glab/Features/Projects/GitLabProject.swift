@@ -248,6 +248,9 @@ nonisolated struct GitLabProject:
         GitLabProjectFeatureAccessLevel?
     let mergeRequestsAccessLevel:
         GitLabProjectFeatureAccessLevel?
+    var projectDescription: String?
+    var openIssuesCount: Int?
+    var forksCount: Int?
 
     var safeWebURL: URL? {
         GitLabWebURL.validated(webURL)
@@ -271,6 +274,10 @@ nonisolated struct GitLabProject:
             return "Project"
         }
         return components.dropLast().joined(separator: "/")
+    }
+
+    var trimmedDescription: String? {
+        projectDescription?.trimmedNonempty
     }
 
     var avatarMark: String {
@@ -310,6 +317,9 @@ nonisolated struct GitLabProject:
             "issues_access_level"
         case mergeRequestsAccessLevel =
             "merge_requests_access_level"
+        case projectDescription = "description"
+        case openIssuesCount = "open_issues_count"
+        case forksCount = "forks_count"
     }
 }
 

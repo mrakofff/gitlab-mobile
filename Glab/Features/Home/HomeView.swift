@@ -88,6 +88,8 @@ struct HomeView: View {
         any GitLabUserServing
     let commitLoader:
         any GitLabCommitLoading
+    let projectOverviewLoader:
+        any GitLabProjectOverviewLoading
     let repositoryLoader:
         any GitLabRepositoryLoading
     let searchModel: GitLabGlobalSearchModel
@@ -446,6 +448,8 @@ struct HomeView: View {
                     commitLoader,
                 repositoryLoader:
                     repositoryLoader,
+                overviewLoader:
+                    projectOverviewLoader,
                 accountID: accountID,
                 appSession: appSession,
                 onResourceEdited:

@@ -31,6 +31,40 @@ nonisolated enum GitLabPipelineEndpoints {
         )
     }
 
+    static func projectPipelines(
+        projectID: Int,
+        perPage: Int = 25
+    ) -> GitLabAPIRequest<
+        [GitLabPipeline]
+    >? {
+        guard projectID > 0 else {
+            return nil
+        }
+
+        return .get(
+            requires: .read,
+            path: [
+                "projects",
+                String(projectID),
+                "pipelines",
+            ],
+            query: [
+                .init(
+                    name: "order_by",
+                    value: "id"
+                ),
+                .init(
+                    name: "sort",
+                    value: "desc"
+                ),
+                .init(
+                    name: "per_page",
+                    value: String(perPage)
+                ),
+            ]
+        )
+    }
+
     static func pipeline(
         at route: GitLabPipelineRoute
     ) -> GitLabAPIRequest<

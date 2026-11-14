@@ -26,3 +26,5 @@
 - Preserve original media extensions when playback URLs are extensionless API routes.
 - Fullscreen image viewers should reload at viewer resolution instead of scaling inline thumbnails.
 - Dashboard counters should use `reliableItemCount` and show `N+` when only a first page is known; never present a loaded page size as a total.
+- `GET /projects/:id/languages` returns a name→percent object, not an array: decode with dynamic keys, sort by share locally, and hide entries that round to 0.0%.
+- Adding optional fields to `GitLabProject` must use `var` (not `let`) so the memberwise init used by tests and fixtures keeps defaults.
