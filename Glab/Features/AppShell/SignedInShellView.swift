@@ -58,6 +58,10 @@ struct SignedInShellView: View {
     @State private var reviewRequestsModel:
         MergeRequestsModel
     @State private var projectsModel: ProjectsModel
+    @State private var homePipelinesModel:
+        HomePipelinesModel
+    @State private var homeLayoutModel:
+        HomeLayoutModel
     @State private var todosModel: TodosModel
     @State private var todoCatchUpModel:
         TodoCatchUpModel
@@ -361,6 +365,23 @@ struct SignedInShellView: View {
                 loader: projectLoader
             )
         )
+        _homePipelinesModel = State(
+            initialValue: HomePipelinesModel(
+                loader:
+                    LiveGitLabHomePipelinesLoader(
+                        client: client
+                    ),
+                isAccountCurrent: {
+                    appSession.activeAccountID
+                        == accountID
+                }
+            )
+        )
+        _homeLayoutModel = State(
+            initialValue: HomeLayoutModel(
+                accountID: accountID
+            )
+        )
         let todosModel = TodosModel(
             loader: todoService,
             mutator: todoService,
@@ -426,6 +447,9 @@ struct SignedInShellView: View {
                         reviewRequestsModel,
                     todosModel: todosModel,
                     projectsModel: projectsModel,
+                    homePipelinesModel:
+                        homePipelinesModel,
+                    homeLayoutModel: homeLayoutModel,
                     issueLoader: issueLoader,
                     mergeRequestLoader: mergeRequestLoader,
                     mergeRequestApprovalService:

@@ -160,6 +160,7 @@ nonisolated struct GitLabHomeMergeRequest:
 nonisolated struct GitLabHomeProject:
     Decodable,
     Equatable,
+    Identifiable,
     Sendable
 {
     let id: Int
