@@ -99,7 +99,15 @@ nonisolated enum GitLabPipelineStageProjector {
             stageRows[stageID]?.append(input)
         }
 
-        return stageNames.map { stageID in
+        // GitLab returns jobs newest-first, so first appearance reverses
+        // the stages; jobs are created in stage order, so order by lowest id.
+        let stageOrder = stageNames.sorted {
+            let lhs = stageRows[$0]?.map(\.id).min() ?? .max
+            let rhs = stageRows[$1]?.map(\.id).min() ?? .max
+            return lhs < rhs
+        }
+
+        return stageOrder.map { stageID in
             let inputs =
                 stageRows[stageID] ?? []
             let counts = Dictionary(
@@ -185,6 +193,15 @@ private nonisolated extension
                 job.stage
             case let .triggerJob(job):
                 job.stage
+            }
+        }
+
+        var id: Int {
+            switch self {
+            case let .job(job):
+                job.id
+            case let .triggerJob(job):
+                job.id
             }
         }
 

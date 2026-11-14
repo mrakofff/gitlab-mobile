@@ -39,7 +39,7 @@ struct GitLabPipelineDetailModelTests {
                         event:
                             triggerEvent([
                                 try triggerJob(
-                                    id: 80,
+                                    id: 95,
                                     name: "deploy child",
                                     stage: "deploy",
                                     status: "pending"
@@ -65,7 +65,7 @@ struct GitLabPipelineDetailModelTests {
         )
         #expect(
             context.model.triggerJobs.items
-                .map(\.id) == [80]
+                .map(\.id) == [95]
         )
         #expect(
             context.model.stages.map(\.name)
@@ -77,7 +77,7 @@ struct GitLabPipelineDetailModelTests {
                 .map(\.id)
                 == [
                     .job(90),
-                    .triggerJob(80),
+                    .triggerJob(95),
                 ]
         )
         #expect(
@@ -392,7 +392,7 @@ struct GitLabPipelineDetailModelTests {
                     jobEvent(
                         [
                             try job(
-                                id: 3,
+                                id: 1,
                                 name: "test",
                                 stage: "test",
                                 status: "running"
@@ -433,7 +433,7 @@ struct GitLabPipelineDetailModelTests {
                         GitLabResourcePage(
                             items: [
                                 try job(
-                                    id: 1,
+                                    id: 3,
                                     name: "deploy",
                                     stage: "deploy",
                                     status: "manual"
@@ -474,7 +474,7 @@ struct GitLabPipelineDetailModelTests {
 
         #expect(
             context.model.jobs.items.map(\.id)
-                == [4, 2, 3, 1]
+                == [4, 2, 1, 3]
         )
         #expect(
             context.model.stages.map(\.name)
