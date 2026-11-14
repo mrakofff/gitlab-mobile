@@ -234,25 +234,3 @@ nonisolated extension GitLabRepositoryEndpoints {
         )
     }
 }
-
-nonisolated extension GitLabRepositoryEndpoints {
-    static func tags(
-        projectID: Int
-    ) -> GitLabAPIRequest<[GitLabRepositoryTag]> {
-        .get(
-            requires: .read,
-            path: [
-                "projects",
-                String(projectID),
-                "repository",
-                "tags",
-            ],
-            query: [
-                URLQueryItem(
-                    name: "per_page",
-                    value: String(treePageSize)
-                ),
-            ]
-        )
-    }
-}
