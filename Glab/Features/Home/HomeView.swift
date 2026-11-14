@@ -4,6 +4,8 @@ private enum HomeNavigationRoute: Hashable {
     case catchUp
     case search
     case reviews
+    case pipelines
+    case editHome
 }
 
 enum HomeSheetDestination: Identifiable {
@@ -54,6 +56,8 @@ struct HomeView: View {
         MergeRequestsModel
     let todosModel: TodosModel
     let projectsModel: ProjectsModel
+    let homePipelinesModel: HomePipelinesModel
+    let homeLayoutModel: HomeLayoutModel
     let issueLoader: any GitLabIssueLoading
     let mergeRequestLoader:
         any GitLabMergeRequestLoading
@@ -108,6 +112,9 @@ struct HomeView: View {
         GitLabIssueRoute?
     @State private var projectStarChange:
         GitLabProjectStarChange?
+    @State private var isEditingHome = false
+    @State private var homeEditDraftLayout =
+        HomeLayout.initial
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -160,8 +167,7 @@ struct HomeView: View {
                         .listRowInsets(.init())
                     }
                 } else {
-                    mergeRequestsSection
-                    issuesSection
+                    overviewModulesSection
                     projectsSection
                 }
             }
@@ -204,6 +210,31 @@ struct HomeView: View {
                     mergeRequestsDestination(
                         initialMode: .reviewRequested
                     )
+                case .pipelines:
+                    HomePipelinesView(
+                        model: homePipelinesModel,
+                        loader: homePipelinesModel
+                            .loaderDescription,
+                        pipelineLoader:
+                            pipelineLoader,
+                        accountID: accountID,
+                        appSession: appSession,
+                        apiAccess:
+                            session.apiAccess
+                    )
+                case .editHome:
+                    HomeEditSheet(
+                        layout: homeEditDraftLayout,
+                        onCancel: {
+                            path.removeLast()
+                        },
+                        onSave: { layout in
+                            homeLayoutModel.save(
+                                layout
+                            )
+                            path.removeLast()
+                        }
+                    )
                 }
             }
             .refreshable {
@@ -237,45 +268,9 @@ struct HomeView: View {
                 ToolbarItemGroup(
                     placement: .topBarTrailing
                 ) {
-                    Button {
-                        path.append(
-                            HomeNavigationRoute
-                                .search
-                        )
-                    } label: {
-                        Image(
-                            systemName:
-                                "magnifyingglass"
-                        )
-                    }
-                    .accessibilityLabel(
-                        "Search GitLab"
-                    )
-                    .accessibilityHint(
-                        "Searches projects, issues, "
-                            + "and merge requests."
-                    )
-                    .accessibilityIdentifier(
-                        "home.searchButton"
-                    )
-
-                    Button {
-                        launchIssueCreation()
-                    } label: {
-                        Image(
-                            systemName:
-                                "square.and.pencil"
-                        )
-                    }
-                    .accessibilityLabel(
-                        "New issue"
-                    )
-                    .accessibilityHint(
-                        "Opens the issue composer."
-                    )
-                    .accessibilityIdentifier(
-                        "home.newIssueButton"
-                    )
+                    editHomeToolbarButton
+                    searchToolbarButton
+                    newIssueToolbarButton
                 }
             }
         }
@@ -340,6 +335,77 @@ struct HomeView: View {
             )
             createdIssueRoute = nil
         }
+        .onAppear {
+            homeEditDraftLayout =
+                homeLayoutModel.layout
+        }
+        .sheet(isPresented: $isEditingHome) {
+            HomeEditSheet(
+                layout: homeEditDraftLayout,
+                onCancel: {
+                    isEditingHome = false
+                },
+                onSave: { layout in
+                    homeLayoutModel.save(layout)
+                    isEditingHome = false
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var editHomeToolbarButton: some View {
+        Button {
+            homeEditDraftLayout =
+                homeLayoutModel.layout
+            isEditingHome = true
+        } label: {
+            Image(systemName: "slider.horizontal.3")
+        }
+        .accessibilityLabel("Edit Home")
+        .accessibilityHint(
+            "Rearrange or hide Home modules."
+        )
+        .accessibilityIdentifier(
+            "home.editHomeButton"
+        )
+    }
+
+    private var searchToolbarButton: some View {
+        Button {
+            openSearch()
+        } label: {
+            Image(systemName: "magnifyingglass")
+        }
+        .accessibilityLabel("Search GitLab")
+        .accessibilityHint(
+            "Searches projects, issues, "
+                + "and merge requests."
+        )
+        .accessibilityIdentifier(
+            "home.searchButton"
+        )
+    }
+
+    private var newIssueToolbarButton: some View {
+        Button {
+            launchIssueCreation()
+        } label: {
+            Image(systemName: "square.and.pencil")
+        }
+        .accessibilityLabel("New issue")
+        .accessibilityHint(
+            "Opens the issue composer."
+        )
+        .accessibilityIdentifier(
+            "home.newIssueButton"
+        )
+    }
+
+    @MainActor
+    private func openSearch() {
+        path.append(HomeNavigationRoute.search)
     }
 
     @MainActor
@@ -526,6 +592,52 @@ struct HomeView: View {
         }
     }
 
+    /// Horizontally scrolling row of stat tiles; the last tile peeks past
+    /// the trailing edge to hint at scroll, like the reference dashboard.
+    /// The scroll view is expanded past the row inset so tile glow clips
+    /// at the screen edge instead of at the row boundary.
+    @ViewBuilder
+    private func homeStatTiles(
+        @ViewBuilder content: () -> some View
+    ) -> some View {
+        let rowInset: CGFloat = 4
+        GlassEffectContainer(spacing: 8) {
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    content()
+                }
+                .padding(.horizontal, rowInset)
+                .padding(.vertical, 4)
+            }
+            .padding(.horizontal, -rowInset)
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+        }
+    }
+
+    /// Fixed-width tile slightly narrower than one column of the former
+    /// 4-column grid so four tiles plus a sliver of the fifth fit in the
+    /// row — the sliver peeks past the trailing edge to hint at scroll.
+    private struct HomeStatTileButton<Label: View>: View {
+        let action: () -> Void
+        @ViewBuilder let label: () -> Label
+
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+        var body: some View {
+            Button(action: action) {
+                label()
+                    .frame(
+                        width: dynamicTypeSize.isAccessibilitySize
+                            ? 220
+                            : (UIScreen.main.bounds.width - 32) / 4
+                            - 12
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private var overviewSection: some View {
         Section {
             HomeNeedsAttentionHeader(
@@ -544,93 +656,127 @@ struct HomeView: View {
                 )
             )
 
-            GitLabStatTileRow {
-                Button {
-                    path.append(
-                        HomeDashboardSection
-                            .assignedMergeRequests
-                    )
-                } label: {
-                    GitLabStatTile(
-                        title: "MRs",
-                        tint: Color.glabAccent,
-                        value:
-                            assignedMergeRequestsModel
-                            .statCountText,
-                        icon: {
-                            GitLabIconView(
-                                .mergeRequest,
-                                pointSize: 18
-                            )
-                        }
-                    )
-                }
+            homeStatTiles {
+                HomeStatTileButton(
+                    action: {
+                        path.append(
+                            HomeDashboardSection
+                                .assignedMergeRequests
+                        )
+                    },
+                    label: {
+                        GitLabStatTile(
+                            title: "MRs",
+                            tint: Color.glabAccent,
+                            value:
+                                assignedMergeRequestsModel
+                                .statCountText,
+                            icon: {
+                                GitLabIconView(
+                                    .mergeRequest,
+                                    pointSize: 18
+                                )
+                            }
+                        )
+                    }
+                )
                 .accessibilityIdentifier(
                     "home.tile.mergeRequests"
                 )
 
-                Button {
-                    path.append(
-                        HomeNavigationRoute.reviews
-                    )
-                } label: {
-                    GitLabStatTile(
-                        title: "Review",
-                        tint: Color.pink,
-                        value:
-                            reviewRequestsModel
-                            .statCountText,
-                        icon: {
-                            Image(systemName: "eye")
-                        }
-                    )
-                }
+                HomeStatTileButton(
+                    action: {
+                        path.append(
+                            HomeNavigationRoute.reviews
+                        )
+                    },
+                    label: {
+                        GitLabStatTile(
+                            title: "Review",
+                            tint: Color.pink,
+                            value:
+                                reviewRequestsModel
+                                .statCountText,
+                            icon: {
+                                Image(systemName: "eye")
+                            }
+                        )
+                    }
+                )
                 .accessibilityIdentifier(
                     "home.tile.review"
                 )
 
-                Button {
-                    onShowTodos()
-                } label: {
-                    GitLabStatTile(
-                        title: "Todos",
-                        tint: Color.orange,
-                        value:
-                            todosModel
-                            .pendingBadgeCount
-                            .map(String.init)
-                            ?? "–",
-                        icon: {
-                            Image(systemName: "checklist")
-                        }
-                    )
-                }
+                HomeStatTileButton(
+                    action: { onShowTodos() },
+                    label: {
+                        GitLabStatTile(
+                            title: "Todos",
+                            tint: Color.orange,
+                            value:
+                                todosModel
+                                .pendingBadgeCount
+                                .map(String.init)
+                                ?? "–",
+                            icon: {
+                                Image(systemName: "checklist")
+                            }
+                        )
+                    }
+                )
                 .accessibilityIdentifier(
                     "home.tile.todos"
                 )
 
-                Button {
-                    path.append(
-                        HomeDashboardSection
-                            .recentProjects
-                    )
-                } label: {
-                    GitLabStatTile(
-                        title: "Projects",
-                        tint: Color.indigo,
-                        value:
-                            projectsModel
-                            .statCountText,
-                        icon: {
-                            Image(systemName: "folder")
-                        }
-                    )
-                }
+                HomeStatTileButton(
+                    action: {
+                        path.append(
+                            HomeDashboardSection
+                                .recentProjects
+                        )
+                    },
+                    label: {
+                        GitLabStatTile(
+                            title: "Projects",
+                            tint: Color.indigo,
+                            value:
+                                projectsModel
+                                .statCountText,
+                            icon: {
+                                Image(systemName: "folder")
+                            }
+                        )
+                    }
+                )
                 .accessibilityIdentifier(
                     "home.tile.projects"
                 )
+
+                HomeStatTileButton(
+                    action: {
+                        path.append(
+                            HomeNavigationRoute
+                                .pipelines
+                        )
+                    },
+                    label: {
+                        GitLabStatTile(
+                            title: "CI",
+                            tint: Color.red,
+                            value: ciTileValue,
+                            icon: {
+                                Image(
+                                    systemName:
+                                        "chart.line.uptrend.xyaxis"
+                                )
+                            }
+                        )
+                    }
+                )
+                .accessibilityIdentifier(
+                    "home.tile.ci"
+                )
             }
-            .buttonStyle(.plain)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
             .listRowInsets(
@@ -651,6 +797,367 @@ struct HomeView: View {
             return nil
         }
         return (reviews ?? 0) + (todos ?? 0)
+    }
+
+    private var recentProjectItems:
+        [GitLabHomeProject] {
+        projectsModel.recentHomeProjects
+    }
+
+    private var starredProjectItems:
+        [GitLabHomeProject] {
+        projectsModel.starredHomeProjects
+    }
+
+    private var ciTileValue: String {
+        let active =
+            homePipelinesModel.activePipelines
+            .count
+        let failed =
+            homePipelinesModel.failedPipelines.count
+        let total = active + failed
+        guard total > 0 else {
+            return "0"
+        }
+        if failed > 0, active > 0 {
+            return "\(total)"
+        }
+        return "\(failed > 0 ? failed : total)"
+    }
+
+    @ViewBuilder
+    private var overviewModulesSection: some View {
+        ForEach(
+            homeLayoutModel.layout.shown,
+            id: \.self
+        ) { module in
+            homeModuleSection(module)
+        }
+    }
+
+    @ViewBuilder
+    private func homeModuleSection(
+        _ module: HomeModule
+    ) -> some View {
+        switch module {
+        case .activePipelines:
+            homePipelinesModule(
+                .activePipelines,
+                items:
+                    homePipelinesModel
+                    .activePipelines
+            )
+        case .failedPipelines:
+            homePipelinesModule(
+                .failedPipelines,
+                items:
+                    homePipelinesModel
+                    .failedPipelines
+            )
+        case .recentPipelines:
+            homePipelinesModule(
+                .recentPipelines,
+                items: homePipelinesModel.pipelines
+            )
+        case .recentProjects:
+            recentProjectsModule
+        case .starredProjects:
+            starredProjectsModule
+        case .assignedMergeRequests:
+            assignedMergeRequestsModule
+        case .myIssues:
+            Section {
+                if
+                    assignedIssuesModel
+                    .items.isEmpty
+                {
+                    workPlaceholder(
+                        for: assignedIssuesModel,
+                        emptyMessage:
+                            HomeDashboardSection
+                            .assignedIssues
+                            .emptyMessage
+                    )
+                } else {
+                    ForEach(
+                        assignedIssuesModel
+                            .items.prefix(3)
+                    ) { issue in
+                        NavigationLink(
+                            value:
+                                GitLabNativeRoute
+                                .issue(
+                                    issue.route
+                                )
+                        ) {
+                            HomeIssueRow(issue: issue)
+                        }
+                        .accessibilityIdentifier(
+                            "home.issue.row"
+                        )
+                    }
+                }
+            } header: {
+                issuesModuleHeader
+            }
+        case .todos:
+            Section {
+                NavigationLink(
+                    value:
+                        HomeDashboardSection
+                        .assignedMergeRequests
+                ) {
+                    HomeModuleEmptyCard(
+                        title:
+                            "\(todosModel.pendingBadgeCount ?? 0) pending"
+                    )
+                }
+                .accessibilityIdentifier(
+                    "home.module.todos"
+                )
+            } header: {
+                HomeModuleHeader(
+                    module: .todos,
+                    countText: todosModel
+                        .pendingBadgeCount
+                        .map(String.init),
+                    onSeeAll: onShowTodos
+                )
+            }
+        }
+    }
+
+    private func homePipelinesModule(
+        _ module: HomeModule,
+        items: [GitLabHomePipeline]
+    ) -> some View {
+        Section {
+            if
+                homePipelinesModel.status == .failed,
+                items.isEmpty
+            {
+                HomeModulePlaceholderCard()
+            } else if
+                homePipelinesModel.status == .loading,
+                items.isEmpty
+            {
+                HomeModulePlaceholderCard(
+                    isLoading: true
+                )
+            } else if items.isEmpty {
+                HomeModuleEmptyCard(
+                    title: "No items yet"
+                )
+            } else {
+                HomeCarouselSection {
+                    ForEach(items.prefix(4)) { item in
+                        pipelineCardLink(item)
+                    }
+                }
+            }
+        } header: {
+            HomeModuleHeader(
+                module: module,
+                countText: items.isEmpty ? nil
+                    : "\(items.count)",
+                onSeeAll: {
+                    path.append(
+                        HomeNavigationRoute
+                            .pipelines
+                    )
+                }
+            )
+        }
+    }
+
+    private var recentProjectsModule: some View {
+        Section {
+            if recentProjectItems.isEmpty {
+                HomeModulePlaceholderCard(
+                    isLoading:
+                        !model.hasLoaded
+                )
+            } else {
+                HomeCarouselSection {
+                    ForEach(
+                        recentProjectItems.prefix(6)
+                    ) { project in
+                        NavigationLink(
+                            value:
+                                GitLabNativeRoute
+                                .project(
+                                    GitLabProjectRoute(
+                                        pathWithNamespace:
+                                            project
+                                            .pathWithNamespace
+                                    )
+                                )
+                        ) {
+                            HomeProjectCard(
+                                project: project
+                            )
+                        }
+                        .accessibilityIdentifier(
+                            "home.module.project.\(project.id)"
+                        )
+                    }
+                }
+            }
+        } header: {
+            HomeModuleHeader(
+                module: .recentProjects,
+                onSeeAll: {
+                    path.append(
+                        HomeDashboardSection
+                            .recentProjects
+                    )
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func pipelineCardLink(
+        _ item: GitLabHomePipeline
+    ) -> some View {
+        if let route = item.route {
+            NavigationLink {
+                GitLabPipelineDetailView(
+                    route: route,
+                    cacheLifetime: item.pipeline
+                        .detailCacheLifetime,
+                    loader: pipelineLoader,
+                    accountID: accountID,
+                    appSession: appSession,
+                    apiAccess: session.apiAccess
+                )
+            } label: {
+                HomePipelineCard(item: item)
+            }
+            .accessibilityIdentifier(
+                "home.module.pipeline.\(item.id)"
+            )
+        }
+    }
+
+    private var starredProjectsModule: some View {
+        Section {
+            if starredProjectItems.isEmpty {
+                HomeModuleEmptyCard(
+                    title: "No starred projects"
+                )
+            } else {
+                HomeCarouselSection {
+                    ForEach(
+                        starredProjectItems.prefix(6)
+                    ) { project in
+                        NavigationLink(
+                            value:
+                                GitLabNativeRoute
+                                .project(
+                                    GitLabProjectRoute(
+                                        pathWithNamespace:
+                                            project
+                                            .pathWithNamespace
+                                    )
+                                )
+                        ) {
+                            HomeProjectCard(
+                                project: project
+                            )
+                        }
+                        .accessibilityIdentifier(
+                            "home.module.starred.\(project.id)"
+                        )
+                    }
+                }
+            }
+        } header: {
+            HomeModuleHeader(
+                module: .starredProjects
+            )
+        }
+    }
+
+    private var assignedMergeRequestsModule:
+        some View
+    {
+        Section {
+            if
+                assignedMergeRequestsModel
+                .items.isEmpty
+            {
+                workPlaceholder(
+                    for: assignedMergeRequestsModel,
+                    emptyMessage:
+                        HomeDashboardSection
+                        .assignedMergeRequests
+                        .emptyMessage
+                )
+            } else {
+                ForEach(
+                    assignedMergeRequestsModel
+                        .items.prefix(3)
+                ) { mergeRequest in
+                    NavigationLink(
+                        value:
+                            GitLabNativeRoute
+                            .mergeRequest(
+                                mergeRequest.route
+                            )
+                    ) {
+                        HomeMergeRequestRow(
+                            mergeRequest:
+                                mergeRequest
+                        )
+                    }
+                    .accessibilityIdentifier(
+                        "home.mergeRequest.row"
+                    )
+                }
+            }
+        } header: {
+            mergeRequestsModuleHeader
+        }
+    }
+
+    private var issuesModuleHeader: some View {
+        HomeModuleHeader(
+            module: .myIssues,
+            countText: issuesModuleCount,
+            onSeeAll: {
+                path.append(
+                    HomeDashboardSection
+                        .assignedIssues
+                )
+            }
+        )
+    }
+
+    private var mergeRequestsModuleHeader:
+        some View
+    {
+        HomeModuleHeader(
+            module: .assignedMergeRequests,
+            countText:
+                mergeRequestsModuleCount,
+            onSeeAll: {
+                path.append(
+                    HomeDashboardSection
+                        .assignedMergeRequests
+                )
+            }
+        )
+    }
+
+    private var issuesModuleCount: String? {
+        assignedIssuesModel.statCount.map(String.init)
+    }
+
+    private var mergeRequestsModuleCount: String? {
+        assignedMergeRequestsModel.statCount.map(
+            String.init
+        )
     }
 
     private var mergeRequestsSection: some View {
@@ -951,12 +1458,15 @@ struct HomeView: View {
             assignedIssuesModel.loadIfNeeded()
         async let projects: Void =
             projectsModel.loadIfNeeded()
+        async let pipelineProbe: Void =
+            homePipelinesModel.loadIfNeeded()
         _ = await (
             home,
             mergeRequests,
             reviews,
             issues,
-            projects
+            projects,
+            pipelineProbe
         )
         await handleAuthenticationFailure()
     }
@@ -971,12 +1481,15 @@ struct HomeView: View {
             assignedIssuesModel.refresh()
         async let projects: Void =
             projectsModel.refresh()
+        async let pipelineProbe: Void =
+            homePipelinesModel.refresh()
         _ = await (
             home,
             mergeRequests,
             reviews,
             issues,
-            projects
+            projects,
+            pipelineProbe
         )
         await handleAuthenticationFailure()
     }
@@ -992,6 +1505,7 @@ struct HomeView: View {
                 ?? assignedIssuesModel
                 .authenticationFailure
                 ?? projectsModel.authenticationFailure
+                ?? homePipelinesModel.loadError
         else {
             return
         }
