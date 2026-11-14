@@ -6,6 +6,8 @@ nonisolated protocol GitLabCommitLoading:
     func loadCommitsPage(
         projectID: Int,
         refName: String?,
+        path: String?,
+        all: Bool,
         after nextPageURL: URL?
     ) async throws(GitLabSessionClientError)
         -> GitLabCommitPage
@@ -57,6 +59,8 @@ extension GitLabCommitLoading {
         let page = try await loadCommitsPage(
             projectID: projectID,
             refName: refName,
+            path: nil,
+            all: false,
             after: nil
         )
         await onPage(
@@ -114,6 +118,8 @@ nonisolated struct LiveGitLabCommitLoader:
     func loadCommitsPage(
         projectID: Int,
         refName: String?,
+        path: String?,
+        all: Bool,
         after nextPageURL: URL?
     ) async throws(GitLabSessionClientError)
         -> GitLabCommitPage
@@ -130,7 +136,9 @@ nonisolated struct LiveGitLabCommitLoader:
                         .commits(
                             projectID:
                                 projectID,
-                            refName: refName
+                            refName: refName,
+                            path: path,
+                            all: all
                         )
                 )
             }

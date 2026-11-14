@@ -156,6 +156,8 @@ final class GitLabProjectOverviewModel {
                 .loadCommitsPage(
                     projectID: project.id,
                     refName: nil,
+                    path: nil,
+                    all: false,
                     after: nil
                 )
             guard isAccountCurrent() else {

@@ -578,6 +578,8 @@ struct HomeView: View {
             GitLabRepositoryFileView(
                 route: fileRoute,
                 loader: repositoryLoader,
+                commitLoader: commitLoader,
+                apiAccess: session.apiAccess,
                 accountID: accountID,
                 appSession: appSession
             )

@@ -51,6 +51,13 @@ nonisolated protocol GitLabRepositoryBrowsing:
         after nextPageURL: URL?
     ) async throws(GitLabSessionClientError)
         -> GitLabRepositorySearchPage
+
+    func loadBlame(
+        projectID: Int,
+        ref: String,
+        path: String
+    ) async throws(GitLabSessionClientError)
+        -> [GitLabBlameRange]
 }
 
 nonisolated protocol GitLabRepositorySourceLoading:
@@ -62,9 +69,22 @@ nonisolated protocol GitLabRepositorySourceLoading:
         -> GitLabSourceDocument
 }
 
+nonisolated protocol GitLabRepositoryFileMutating:
+    Sendable
+{
+    func deleteFile(
+        projectID: Int,
+        ref: String,
+        path: String,
+        commitMessage: String
+    ) async throws(GitLabSessionClientError)
+        -> GitLabRepositoryFileCommitResponse
+}
+
 nonisolated protocol GitLabRepositoryLoading:
     GitLabRepositoryBrowsing,
-    GitLabRepositorySourceLoading
+    GitLabRepositorySourceLoading,
+    GitLabRepositoryFileMutating
 {}
 
 extension GitLabRepositoryBrowsing {
@@ -297,6 +317,42 @@ nonisolated struct LiveGitLabRepositoryLoader:
             results: response.value,
             nextPageURL:
                 response.metadata.nextPageURL
+        )
+    }
+
+    @concurrent
+    func loadBlame(
+        projectID: Int,
+        ref: String,
+        path: String
+    ) async throws(GitLabSessionClientError)
+        -> [GitLabBlameRange]
+    {
+        try await client.send(
+            GitLabRepositoryEndpoints.blame(
+                projectID: projectID,
+                ref: ref,
+                path: path
+            )
+        )
+    }
+
+    @concurrent
+    func deleteFile(
+        projectID: Int,
+        ref: String,
+        path: String,
+        commitMessage: String
+    ) async throws(GitLabSessionClientError)
+        -> GitLabRepositoryFileCommitResponse
+    {
+        try await client.send(
+            GitLabRepositoryEndpoints.deleteFile(
+                projectID: projectID,
+                ref: ref,
+                path: path,
+                commitMessage: commitMessage
+            )
         )
     }
 

@@ -352,6 +352,8 @@ struct GitLabProjectDetailView: View {
                     GitLabProjectReadmeView(
                         route: readmeRoute,
                         loader: repositoryLoader,
+                        commitLoader: commitLoader,
+                        apiAccess: apiAccess,
                         accountID: accountID,
                         appSession: appSession
                     )
@@ -777,6 +779,9 @@ struct GitLabProjectDetailView: View {
                             project: project,
                             loader:
                                 repositoryLoader,
+                            commitLoader:
+                                commitLoader,
+                            apiAccess: apiAccess,
                             accountID: accountID,
                             appSession: appSession
                         )
@@ -807,6 +812,25 @@ struct GitLabProjectDetailView: View {
                     .accessibilityIdentifier(
                         "project.commits"
                     )
+
+                    NavigationLink {
+                        GitLabCommitLogView(
+                            project: project,
+                            commitLoader: commitLoader,
+                            repositoryLoader:
+                                repositoryLoader,
+                            accountID: accountID,
+                            appSession: appSession
+                        )
+                    } label: {
+                        codeButtonLabel(
+                            "Tags",
+                            systemImage: "tag"
+                        )
+                    }
+                    .accessibilityIdentifier(
+                        "project.commitlog"
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -824,7 +848,7 @@ struct GitLabProjectDetailView: View {
                 ForEach(commits) { commit in
                     NavigationLink {
                         GitLabCommitDetailView(
-                            project: project,
+                            projectID: project.id,
                             commit: commit,
                             loader: commitLoader,
                             accountID: accountID,
@@ -1166,7 +1190,9 @@ struct GitLabProjectDetailView: View {
 
 private struct GitLabProjectReadmeView: View {
     let route: GitLabRepositoryFileRoute
-    let loader: any GitLabRepositorySourceLoading
+    let loader: any GitLabRepositoryLoading
+    let commitLoader: any GitLabCommitLoading
+    let apiAccess: GitLabAPIAccess
     let accountID: GitLabAccountID
     let appSession: AppSession
 
@@ -1179,12 +1205,16 @@ private struct GitLabProjectReadmeView: View {
         GitLabRepositoryFileModel
     init(
         route: GitLabRepositoryFileRoute,
-        loader: any GitLabRepositorySourceLoading,
+        loader: any GitLabRepositoryLoading,
+        commitLoader: any GitLabCommitLoading,
+        apiAccess: GitLabAPIAccess,
         accountID: GitLabAccountID,
         appSession: AppSession
     ) {
         self.route = route
         self.loader = loader
+        self.commitLoader = commitLoader
+        self.apiAccess = apiAccess
         self.accountID = accountID
         self.appSession = appSession
         _model = State(
@@ -1437,6 +1467,8 @@ private struct GitLabProjectReadmeView: View {
         GitLabRepositoryFileView(
             route: route,
             loader: loader,
+            commitLoader: commitLoader,
+            apiAccess: apiAccess,
             accountID: accountID,
             appSession: appSession,
             initialPresentation: presentation

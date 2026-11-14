@@ -80,6 +80,35 @@ struct GitLabRepositoryEndpointTests {
         )
     }
 
+    @Test("Builds blame and delete-file requests")
+    func buildsBlameAndDeleteFileRequests() throws {
+        let blame = try requestURL(
+            GitLabRepositoryEndpoints.blame(
+                projectID: 42,
+                ref: "main",
+                path: "Sources/App.swift"
+            )
+        )
+        let delete = GitLabRepositoryEndpoints.deleteFile(
+            projectID: 42,
+            ref: "main",
+            path: "Sources/App.swift",
+            commitMessage: "Delete App.swift"
+        )
+        let deleteURL = try requestURL(delete)
+
+        #expect(blame.absoluteString
+            == "https://gitlab.example.com/api/v4/"
+                + "projects/42/repository/blame"
+                + "?filepath=Sources/App.swift&ref=main")
+        #expect(deleteURL.absoluteString
+            == "https://gitlab.example.com/api/v4/"
+                + "projects/42/repository/files/"
+                + "Sources%2FApp.swift"
+                + "?ref=main&commit_message=Delete%20App.swift")
+        #expect(delete.requiredAccess == .write)
+    }
+
     @Test("Encodes a file path as one raw endpoint component")
     func buildsRawFileRequest() throws {
         let route = GitLabRepositoryFileRoute(

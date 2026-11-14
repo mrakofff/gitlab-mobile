@@ -29,6 +29,8 @@ where
                         projectID:
                             projectID,
                         refName: refName,
+                        path: nil,
+                        all: false,
                         after: nextPageURL
                     )
                 return GitLabResourcePage(

@@ -19,6 +19,25 @@ nonisolated enum GitLabSourceLanguage:
     case markdown
     case plainText
 
+    var displayTitle: String {
+        switch self {
+        case .swift: "Swift"
+        case .shell: "Shell"
+        case .json: "JSON"
+        case .yaml: "YAML"
+        case .python: "Python"
+        case .javascript: "JavaScript"
+        case .typescript: "TypeScript"
+        case .ruby: "Ruby"
+        case .rust: "Rust"
+        case .go: "Go"
+        case .cLike: "C/C++"
+        case .markup: "XML"
+        case .markdown: "Markdown"
+        case .plainText: "Text"
+        }
+    }
+
     init(fileName: String) {
         let normalized = fileName.lowercased()
         let fileExtension = URL(

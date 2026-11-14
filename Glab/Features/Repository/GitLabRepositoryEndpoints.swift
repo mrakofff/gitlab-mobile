@@ -155,6 +155,84 @@ nonisolated enum GitLabRepositoryEndpoints {
             ]
         )
     }
+
+    static func deleteFile(
+        projectID: Int,
+        ref: String,
+        path: String,
+        commitMessage: String
+    ) -> GitLabAPIRequest<
+        GitLabRepositoryFileCommitResponse
+    > {
+        .delete(
+            requires: .write,
+            path: [
+                "projects",
+                String(projectID),
+                "repository",
+                "files",
+                path,
+            ],
+            query: [
+                URLQueryItem(
+                    name: "ref",
+                    value: ref
+                ),
+                URLQueryItem(
+                    name: "commit_message",
+                    value: commitMessage
+                ),
+            ]
+        )
+    }
+}
+
+nonisolated extension GitLabRepositoryEndpoints {
+    static func blame(
+        projectID: Int,
+        ref: String,
+        path: String
+    ) -> GitLabAPIRequest<[GitLabBlameRange]> {
+        .get(
+            requires: .read,
+            path: [
+                "projects",
+                String(projectID),
+                "repository",
+                "blame",
+            ],
+            query: [
+                URLQueryItem(
+                    name: "filepath",
+                    value: path
+                ),
+                URLQueryItem(
+                    name: "ref",
+                    value: ref
+                ),
+            ]
+        )
+    }
+
+    static func tags(
+        projectID: Int
+    ) -> GitLabAPIRequest<[GitLabRepositoryTag]> {
+        .get(
+            requires: .read,
+            path: [
+                "projects",
+                String(projectID),
+                "repository",
+                "tags",
+            ],
+            query: [
+                URLQueryItem(
+                    name: "per_page",
+                    value: String(treePageSize)
+                ),
+            ]
+        )
+    }
 }
 
 nonisolated extension GitLabRepositoryEndpoints {

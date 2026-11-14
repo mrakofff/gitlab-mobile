@@ -35,6 +35,10 @@
                         GitLabRepositoryFixtureLoader
                         .project,
                     loader: loader,
+                    commitLoader:
+                        GitLabRepositoryFixtureCommitLoader(
+                        ),
+                    apiAccess: .readWrite,
                     accountID: accountID,
                     appSession: appSession
                 )
@@ -191,6 +195,35 @@
             return GitLabRepositorySearchPage(
                 results: matches,
                 nextPageURL: nil
+            )
+        }
+
+        func loadBlame(
+            projectID: Int,
+            ref: String,
+            path: String
+        ) async throws(GitLabSessionClientError)
+            -> [GitLabBlameRange]
+        {
+            guard
+                projectID == Self.project.id,
+                Self.sources[path] != nil
+            else {
+                throw .api(.notFound)
+            }
+            return Self.blameRanges
+        }
+
+        func deleteFile(
+            projectID: Int,
+            ref: String,
+            path: String,
+            commitMessage: String
+        ) async throws(GitLabSessionClientError)
+            -> GitLabRepositoryFileCommitResponse
+        {
+            throw .api(
+                .forbidden
             )
         }
 
@@ -377,6 +410,72 @@
                     : "100644"
             )
         }
+
+        private static let fixtureCommits: [
+            String: GitLabCommit
+        ] = [
+            "c856e4e1a1b2c3d4e5f60718293a4b5c6d7e8f90":
+                GitLabCommit(
+                    id: "c856e4e1a1b2c3d4e5f60718293a4b5c6d7e8f90",
+                    shortID: "c856e4e1",
+                    title: "Add blame sheet layout",
+                    authorName: "Andrei Mrakoff",
+                    authorEmail: "andrei@example.com",
+                    authoredDate: Date(
+                        timeIntervalSinceNow: -1_209_600
+                    ),
+                    committerName: "Andrei Mrakoff",
+                    committerEmail: "andrei@example.com",
+                    committedDate: Date(
+                        timeIntervalSinceNow: -1_209_600
+                    ),
+                    message: "Add blame sheet layout",
+                    parentIDs: [],
+                    webURL: nil
+                ),
+            "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d":
+                GitLabCommit(
+                    id: "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d",
+                    shortID: "1a2b3c4d",
+                    title: "Initial fixture commit",
+                    authorName: "Andrei Mrakoff",
+                    authorEmail: "andrei@example.com",
+                    authoredDate: Date(
+                        timeIntervalSinceNow: -3_456_000
+                    ),
+                    committerName: "Andrei Mrakoff",
+                    committerEmail: "andrei@example.com",
+                    committedDate: Date(
+                        timeIntervalSinceNow: -3_456_000
+                    ),
+                    message: "Initial fixture commit",
+                    parentIDs: [],
+                    webURL: nil
+                ),
+        ]
+
+        private static let blameRanges = [
+            GitLabBlameRange(
+                commit: fixtureCommits[
+                    "c856e4e1a1b2c3d4e5f60718293a4b5c6d7e8f90"
+                ]!,
+                lines: [
+                    "// Fixture blame range",
+                    "import Foundation",
+                    "",
+                    "struct Example {",
+                    "    let name: String",
+                ]
+            ),
+            GitLabBlameRange(
+                commit: fixtureCommits[
+                    "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+                ]!,
+                lines: [
+                    "}",
+                ]
+            ),
+        ]
     }
 
     private actor GitLabRepositoryFixtureImageLoader:
@@ -455,5 +554,57 @@
                 </svg>
                 """
         }()
+    }
+
+    private nonisolated struct
+        GitLabRepositoryFixtureCommitLoader:
+        GitLabCommitLoading,
+        Sendable
+    {
+        @concurrent
+        func loadCommitsPage(
+            projectID: Int,
+            refName: String?,
+            path: String?,
+            all: Bool,
+            after nextPageURL: URL?
+        ) async throws(GitLabSessionClientError)
+            -> GitLabCommitPage
+        {
+            guard projectID == 42 else {
+                throw .api(.notFound)
+            }
+            let commit = GitLabCommit(
+                id: "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+                shortID: "a1a1a1a",
+                title: "Add repository browser",
+                authorName: "Andrei Mrakoff",
+                authorEmail: "andrei@example.com",
+                authoredDate: Date(
+                    timeIntervalSinceNow: -172_800
+                ),
+                committerName: "Andrei Mrakoff",
+                committerEmail: "andrei@example.com",
+                committedDate: Date(
+                    timeIntervalSinceNow: -172_800
+                ),
+                message: "Add repository browser",
+                parentIDs: [],
+                webURL: nil
+            )
+            return GitLabCommitPage(
+                commits: [commit],
+                nextPageURL: nil
+            )
+        }
+
+        @concurrent
+        func loadCommitDiff(
+            at route: GitLabCommitDiffRoute
+        ) async throws(GitLabSessionClientError)
+            -> [GitLabDiffFile]
+        {
+            []
+        }
     }
 #endif

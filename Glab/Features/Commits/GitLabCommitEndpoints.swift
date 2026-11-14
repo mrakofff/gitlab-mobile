@@ -3,7 +3,9 @@ import Foundation
 nonisolated enum GitLabCommitEndpoints {
     static func commits(
         projectID: Int,
-        refName: String?
+        refName: String?,
+        path: String? = nil,
+        all: Bool = false
     ) -> GitLabAPIRequest<[GitLabCommit]> {
         var query = [
             URLQueryItem(
@@ -22,6 +24,28 @@ nonisolated enum GitLabCommitEndpoints {
                 URLQueryItem(
                     name: "ref_name",
                     value: refName
+                )
+            )
+        }
+        if
+            let path =
+                path?.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ),
+            !path.isEmpty
+        {
+            query.append(
+                URLQueryItem(
+                    name: "path",
+                    value: path
+                )
+            )
+        }
+        if all {
+            query.append(
+                URLQueryItem(
+                    name: "all",
+                    value: "true"
                 )
             )
         }
