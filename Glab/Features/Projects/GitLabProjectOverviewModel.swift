@@ -33,6 +33,12 @@ final class GitLabProjectOverviewModel {
     private(set) var openMergeRequestCount:
         GitLabProjectOverviewSection<Int?> =
         .loading
+    private(set) var branchCount:
+        GitLabProjectOverviewSection<Int?> =
+        .loading
+    private(set) var releaseCount:
+        GitLabProjectOverviewSection<Int?> =
+        .loading
     private(set) var authenticationFailure:
         GitLabSessionClientError?
 
@@ -83,12 +89,48 @@ final class GitLabProjectOverviewModel {
         async let pipeline: Void = loadLatestPipeline()
         async let mergeRequests: Void =
             loadOpenMergeRequestCount()
+        async let branches: Void = loadBranchCount()
+        async let releases: Void = loadReleaseCount()
         _ = await (
             languages,
             commits,
             pipeline,
-            mergeRequests
+            mergeRequests,
+            branches,
+            releases
         )
+    }
+
+    private func loadBranchCount() async {
+        do throws(GitLabSessionClientError) {
+            let value =
+                try await overviewLoader
+                .loadBranchCount(projectID: project.id)
+            guard isAccountCurrent() else {
+                return
+            }
+            branchCount = .loaded(value)
+        } catch {
+            record(error) {
+                branchCount.failIfLoading()
+            }
+        }
+    }
+
+    private func loadReleaseCount() async {
+        do throws(GitLabSessionClientError) {
+            let value =
+                try await overviewLoader
+                .loadReleaseCount(projectID: project.id)
+            guard isAccountCurrent() else {
+                return
+            }
+            releaseCount = .loaded(value)
+        } catch {
+            record(error) {
+                releaseCount.failIfLoading()
+            }
+        }
     }
 
     private func loadLanguages() async {

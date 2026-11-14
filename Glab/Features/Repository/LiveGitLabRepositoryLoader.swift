@@ -38,6 +38,12 @@ nonisolated protocol GitLabRepositoryBrowsing:
     ) async throws(GitLabSessionClientError)
         -> GitLabRepositoryBranch
 
+    func loadTagsPage(
+        projectID: Int,
+        after nextPageURL: URL?
+    ) async throws(GitLabSessionClientError)
+        -> GitLabRepositoryTagPage
+
     func loadSearchPage(
         projectID: Int,
         ref: String,
@@ -227,6 +233,35 @@ nonisolated struct LiveGitLabRepositoryLoader:
                 projectID: projectID,
                 name: name
             )
+        )
+    }
+
+    @concurrent
+    func loadTagsPage(
+        projectID: Int,
+        after nextPageURL: URL?
+    ) async throws(GitLabSessionClientError)
+        -> GitLabRepositoryTagPage
+    {
+        let request:
+            GitLabAPIPageRequest<
+                [GitLabRepositoryTag]
+            > =
+            if let nextPageURL {
+                .next(nextPageURL)
+            } else {
+                .initial(
+                    GitLabRepositoryEndpoints
+                        .tags(projectID: projectID)
+                )
+            }
+        let response = try await client
+            .sendPage(request)
+
+        return GitLabRepositoryTagPage(
+            tags: response.value,
+            nextPageURL:
+                response.metadata.nextPageURL
         )
     }
 

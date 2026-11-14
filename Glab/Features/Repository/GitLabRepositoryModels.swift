@@ -434,3 +434,153 @@ final class GitLabRepositoryFileModel {
         }
     }
 }
+
+nonisolated struct GitLabRepositoryTag:
+    Decodable,
+    Equatable,
+    Identifiable,
+    Sendable
+{
+    let name: String
+    let message: String?
+    let commitID: String?
+
+    var id: String { name }
+
+    var shortCommitID: String? {
+        guard
+            let commitID,
+            commitID.count > 8
+        else {
+            return commitID
+        }
+        return String(commitID.prefix(8))
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case message
+        case targetCommit = "target_commit"
+    }
+
+    init(
+        name: String,
+        message: String?,
+        commitID: String?
+    ) {
+        self.name = name
+        self.message = message
+        self.commitID = commitID
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(
+            keyedBy: CodingKeys.self
+        )
+        name = try container.decode(
+            String.self,
+            forKey: .name
+        )
+        message = try container.decodeIfPresent(
+            String.self,
+            forKey: .message
+        )
+        // target_commit is a commit object in the API;
+        // tolerate an object with "id" or a raw sha string.
+        if let commitObject = try? container.nestedContainer(
+            keyedBy: CommitObjectKey.self,
+            forKey: .targetCommit
+        ) {
+            commitID = try commitObject.decodeIfPresent(
+                String.self,
+                forKey: .id
+            )
+        } else {
+            commitID = try container.decodeIfPresent(
+                String.self,
+                forKey: .targetCommit
+            )
+        }
+    }
+
+    private enum CommitObjectKey: String, CodingKey {
+        case id
+    }
+}
+
+nonisolated struct GitLabRepositoryTagPage:
+    Equatable,
+    Sendable
+{
+    let tags: [GitLabRepositoryTag]
+    let nextPageURL: URL?
+}
+
+typealias GitLabRepositoryTagsModel =
+    GitLabPaginatedResourceModel<
+        GitLabRepositoryTag,
+        String
+    >
+
+extension GitLabPaginatedResourceModel
+where
+    Item == GitLabRepositoryTag,
+    Identity == String
+{
+    convenience init(
+        projectID: Int,
+        loader: any GitLabRepositoryBrowsing
+    ) {
+        self.init(
+            loadPage: {
+                (nextPageURL: URL?) async throws(
+                    GitLabSessionClientError
+                ) -> GitLabResourcePage<
+                    GitLabRepositoryTag
+                > in
+                let page = try await loader
+                    .loadTagsPage(
+                        projectID: projectID,
+                        after: nextPageURL
+                    )
+                return GitLabResourcePage(
+                    items: page.tags,
+                    nextPageURL:
+                        page.nextPageURL
+                )
+            },
+            loadFirstPage: {
+                (
+                    _:
+                        GitLabCacheRefreshBehavior,
+                    onPage:
+                        @escaping @Sendable (
+                            GitLabResourcePageEvent<
+                                GitLabRepositoryTag
+                            >
+                        ) async -> Void
+                ) async throws(
+                    GitLabSessionClientError
+                ) -> Void in
+                let loadedPage = try await loader
+                    .loadTagsPage(
+                        projectID: projectID,
+                        after: nil
+                    )
+                await onPage(
+                    GitLabResourcePageEvent(
+                        page: GitLabResourcePage(
+                            items: loadedPage.tags,
+                            nextPageURL:
+                                loadedPage
+                                .nextPageURL
+                        ),
+                        source: .network
+                    )
+                )
+            },
+            identity: \GitLabRepositoryTag.name,
+            searchValues: { [$0.name] }
+        )
+    }
+}

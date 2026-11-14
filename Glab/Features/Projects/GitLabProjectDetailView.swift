@@ -168,6 +168,15 @@ struct GitLabProjectDetailView: View {
         content
             .navigationTitle("Project")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(
+                    placement: .topBarTrailing
+                ) {
+                    if let project = loadedProject {
+                        projectMenu(project)
+                    }
+                }
+            }
             .background(
                 Color.glabCanvas
             )
@@ -300,6 +309,40 @@ struct GitLabProjectDetailView: View {
 
                 projectCodeSection(project)
 
+                GitLabProjectWorkSection(
+                    project: project,
+                    overviewModel: overviewModel,
+                    repositoryLoader:
+                        repositoryLoader,
+                    issueLoader: issueLoader,
+                    mergeRequestLoader:
+                        mergeRequestLoader,
+                    mergeRequestApprovalService:
+                        mergeRequestApprovalService,
+                    mergeRequestMergeService:
+                        mergeRequestMergeService,
+                    pipelineLoader: pipelineLoader,
+                    discussionLoader:
+                        discussionLoader,
+                    discussionMutator:
+                        discussionMutator,
+                    reactionService:
+                        reactionService,
+                    editService: editService,
+                    issueStatusService:
+                        issueStatusService,
+                    issueCreationService:
+                        issueCreationService,
+                    overviewLoader: overviewLoader,
+                    apiAccess: apiAccess,
+                    accountID: accountID,
+                    appSession: appSession,
+                    onResourceEdited:
+                        onResourceEdited,
+                    isAccountCurrent:
+                        isAccountCurrent
+                )
+
                 if
                     let readmeRoute =
                         GitLabRepositoryFileRoute(
@@ -314,6 +357,8 @@ struct GitLabProjectDetailView: View {
                     )
                     .id(readmeRoute)
                 }
+
+                GitLabProjectToolsSection()
             }
             .padding(20)
         }
@@ -878,6 +923,57 @@ struct GitLabProjectDetailView: View {
             .contentShape(.rect(cornerRadius: 14))
     }
 
+    private func projectMenu(
+        _ project: GitLabProject
+    ) -> some View {
+        Menu {
+            if let url = project.safeWebURL {
+                Button {
+                    UIPasteboard.general.string =
+                        url.absoluteString
+                } label: {
+                    Label(
+                        "Copy Link",
+                        systemImage:
+                            "link"
+                    )
+                }
+            }
+
+            Button {
+                UIPasteboard.general.string =
+                    String(project.id)
+            } label: {
+                Label(
+                    "Copy Project ID",
+                    systemImage:
+                        "number"
+                )
+            }
+
+            NavigationLink {
+                GitLabProjectComingSoonView(
+                    title: "Compare Branches"
+                )
+            } label: {
+                Label(
+                    "Compare Branches",
+                    systemImage:
+                        "arrow.left.arrow.right"
+                )
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .frame(
+                    width: 30,
+                    height: 30
+                )
+        }
+        .buttonStyle(.glass(.clear))
+        .buttonBorderShape(.circle)
+        .accessibilityLabel("Project actions")
+    }
+
     private func projectIssuesDestination(
         _ project: GitLabProject
     ) -> some View {
@@ -1074,6 +1170,9 @@ private struct GitLabProjectReadmeView: View {
     let accountID: GitLabAccountID
     let appSession: AppSession
 
+    @State private var isExpanded = false
+    @State private var isCollapsible = false
+
     @Environment(\.gitLabReadOnlyMarkdownRenderer)
     private var readOnlyMarkdownRenderer
     @State private var model:
@@ -1147,6 +1246,31 @@ private struct GitLabProjectReadmeView: View {
             .truncationMode(.middle)
 
             Spacer(minLength: 8)
+
+            if isCollapsible {
+                Button {
+                    isExpanded.toggle()
+                } label: {
+                    Text(
+                        isExpanded
+                            ? "Show Less"
+                            : "Show All"
+                    )
+                    .font(
+                        .glabCallout.weight(
+                            .semibold
+                        )
+                    )
+                    .foregroundStyle(
+                        Color.glabAccent
+                    )
+                }
+                .accessibilityIdentifier(
+                    isExpanded
+                        ? "project.readme.showLess"
+                        : "project.readme.showAll"
+                )
+            }
 
             Menu {
                 NavigationLink {
@@ -1271,6 +1395,39 @@ private struct GitLabProjectReadmeView: View {
             renderer:
                 readOnlyMarkdownRenderer
         )
+        .fixedSize(horizontal: false, vertical: true)
+        .background(
+            GeometryReader { full in
+                Color.clear.preference(
+                    key: GitLabReadmeHeightKey.self,
+                    value: full.size.height
+                )
+            }
+        )
+        .frame(
+            height: isExpanded ? nil : 220,
+            alignment: .top
+        )
+        .clipped()
+        .overlay(alignment: .bottom) {
+            if !isExpanded && isCollapsible {
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        Color.glabCanvas,
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 70)
+                .allowsHitTesting(false)
+            }
+        }
+        .onPreferenceChange(
+            GitLabReadmeHeightKey.self
+        ) { height in
+            isCollapsible = height > 260
+        }
     }
 
     private func fileView(
@@ -1299,5 +1456,18 @@ private struct GitLabProjectReadmeView: View {
                 error,
                 for: accountID
             )
+    }
+}
+
+private struct GitLabReadmeHeightKey:
+    PreferenceKey
+{
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(
+        value: inout CGFloat,
+        nextValue: () -> CGFloat
+    ) {
+        value = max(value, nextValue())
     }
 }
