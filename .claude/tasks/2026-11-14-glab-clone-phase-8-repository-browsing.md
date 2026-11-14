@@ -1,6 +1,6 @@
 # Задача: Фаза 8 — Repository browsing (blame, история, файл-действия, лог+теги)
 
-**Статус:** open
+**Статус:** done (merge 991ea0a + fix 45aa372, 2026-11-15)
 **План:** ~/.claude/plans/composed-forging-volcano.md — «Дополнение (2026-11-14)»
 **Создана:** 2026-11-14
 **Референс:** /Users/andrei/glab-reference r10–r15, r17 (NOTES.md)
