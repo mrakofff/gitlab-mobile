@@ -1,8 +1,10 @@
 # Задача: Фаза 5 — Diff review (s5)
 
-**Статус:** open (блокируется phase-1…4 — последняя фаза)
+**Статус:** done (d9828aa, смёржено в main 2026-11-15)
 **План:** ../plans/2026-11-07-glab-clone.md (Фаза 5)
 **Создана:** 2026-11-07
+
+**Примечание (2026-11-15):** word-подсветка — LCS на токенах (word/сепаратор), guard 4M клеток; проекционно-относительные NSRange в подсветке. Скриншоты диффа не сняты — на инстансе нет открытого MR (mutations запрещены); tap-through Approve/Merge — за пользователем. Comment — sheet, не keyboard-accessory (нативнее для multiline). Line-sheet треды стартуют развёрнутыми (фиксированный rowHeight UICollectionView не даёт true-inline-блоков).
 
 +++ ### Цель
 Экран дифф-ревью в стиле s5: word-level подсветка изменений внутри строк, чипы заголовка файла, inline-обсуждения с Resolve/Reply, нижний бар Approve + Merge с comment-полем.
