@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 nonisolated struct GitLabDiffSyntaxHighlightRequest:
     Sendable
@@ -14,6 +15,8 @@ nonisolated struct GitLabDiffHighlightedLine:
 {
     private let source: GitLabHighlightedText
     private let range: NSRange
+    private let wordRanges:
+        [(range: NSRange, kind: GitLabDiffLineKind)]?
 
     init(
         source: GitLabHighlightedText,
@@ -21,6 +24,22 @@ nonisolated struct GitLabDiffHighlightedLine:
     ) {
         self.source = source
         self.range = range
+        wordRanges = nil
+    }
+
+    /// Lines configured with word-level change ranges get background
+    /// tints for added or removed tokens within the line.
+    init(
+        source: GitLabHighlightedText,
+        range: NSRange,
+        wordRanges: [(
+            range: NSRange,
+            kind: GitLabDiffLineKind
+        )]
+    ) {
+        self.source = source
+        self.range = range
+        self.wordRanges = wordRanges
     }
 
     init(_ attributedString: NSAttributedString) {
@@ -31,13 +50,57 @@ nonisolated struct GitLabDiffHighlightedLine:
             location: 0,
             length: attributedString.length
         )
+        wordRanges = nil
+    }
+
+    /// Returns a copy configured with word-level tint ranges.
+    func withWordRanges(
+        _ newWordRanges: [(
+            range: NSRange,
+            kind: GitLabDiffLineKind
+        )]
+    ) -> GitLabDiffHighlightedLine {
+        GitLabDiffHighlightedLine(
+            source: source,
+            range: range,
+            wordRanges: newWordRanges
+        )
     }
 
     var attributedString: NSAttributedString {
-        source.attributedString.attributedSubstring(
-            from: range
+        let substring =
+            source.attributedString.attributedSubstring(
+                from: range
+            )
+        guard let wordRanges, !wordRanges.isEmpty else {
+            return substring
+        }
+        let result = NSMutableAttributedString(
+            attributedString: substring
         )
+        let offset = range.location
+        for wordRange in wordRanges {
+            let color =
+                wordRange.kind == .addition
+                ? Self.additionWordColor
+                : Self.deletionWordColor
+            result.addAttribute(
+                .backgroundColor,
+                value: color,
+                range: NSRange(
+                    location: wordRange.range.location - offset,
+                    length: wordRange.range.length
+                )
+            )
+        }
+        return result
     }
+
+    private static let additionWordColor =
+        UIColor.systemGreen.withAlphaComponent(0.28)
+
+    private static let deletionWordColor =
+        UIColor.systemRed.withAlphaComponent(0.32)
 }
 
 nonisolated struct GitLabDiffSyntaxHighlighter:
@@ -128,7 +191,186 @@ nonisolated struct GitLabDiffSyntaxHighlighter:
         }
 
         try Task.checkCancellation()
+        let wordHighlights = try Self.wordHighlightRanges(
+            in: request.document
+        )
+        guard !wordHighlights.isEmpty else {
+            return result
+        }
+        for (index, line) in result {
+            guard
+                let ranges = wordHighlights[index],
+                !ranges.isEmpty
+            else {
+                continue
+            }
+            result[index] = line
+                .withWordRanges(ranges)
+        }
         return result
+    }
+
+    /// Pairs each deletion run with the addition run that follows it and
+    /// marks the tokens that actually changed inside both lines. Ranges
+    /// are projection-relative: locations follow the order in which the
+    /// old or new projection concatenates its lines, mirroring
+    /// `lineRanges(for:in:)`.
+    private static func wordHighlightRanges(
+        in document: GitLabParsedDiffDocument
+    ) throws -> [Int: [(
+        range: NSRange,
+        kind: GitLabDiffLineKind
+    )]] {
+        var result: [Int: [(
+            range: NSRange,
+            kind: GitLabDiffLineKind
+        )]] = [:]
+        var oldLocations: [Int: NSRange] = [:]
+        var newLocations: [Int: NSRange] = [:]
+        var oldLocation = 0
+        var newLocation = 0
+
+        for item in document.items {
+            guard let line = item.line else {
+                continue
+            }
+            let length = line.text.utf16.count
+            switch line.kind {
+            case .deletion:
+                oldLocations[line.ordinal] =
+                    NSRange(
+                        location: oldLocation,
+                        length: length
+                    )
+                oldLocation += length + 1
+            case .addition:
+                newLocations[line.ordinal] =
+                    NSRange(
+                        location: newLocation,
+                        length: length
+                    )
+                newLocation += length + 1
+            case .context:
+                oldLocations[line.ordinal] =
+                    NSRange(
+                        location: oldLocation,
+                        length: length
+                    )
+                oldLocation += length + 1
+                newLocations[line.ordinal] =
+                    NSRange(
+                        location: newLocation,
+                        length: length
+                    )
+                newLocation += length + 1
+            }
+        }
+
+        var deletionRun: [GitLabDiffLine] = []
+        var additionRun: [GitLabDiffLine] = []
+
+        func flushRun() throws {
+            guard
+                !deletionRun.isEmpty,
+                !additionRun.isEmpty
+            else {
+                deletionRun = []
+                additionRun = []
+                return
+            }
+            defer {
+                deletionRun = []
+                additionRun = []
+            }
+            try Task.checkCancellation()
+            let pairCount = min(
+                deletionRun.count,
+                additionRun.count
+            )
+            for index in 0..<pairCount {
+                let segments = GitLabDiffWordHighlighter.segments(
+                    old: deletionRun[index].text,
+                    new: additionRun[index].text
+                )
+                if
+                    let oldRange = oldLocations[
+                        deletionRun[index].ordinal
+                    ],
+                    !segments.old.isEmpty
+                {
+                    result[deletionRun[index].ordinal, default: []] =
+                        wordRanges(
+                            for: segments.old,
+                            kind: .deletion,
+                            absoluteRange: oldRange
+                        )
+                }
+                if
+                    let newRange = newLocations[
+                        additionRun[index].ordinal
+                    ],
+                    !segments.new.isEmpty
+                {
+                    result[additionRun[index].ordinal, default: []] =
+                        wordRanges(
+                            for: segments.new,
+                            kind: .addition,
+                            absoluteRange: newRange
+                        )
+                }
+            }
+        }
+
+        for item in document.items {
+            guard let line = item.line else {
+                // A hunk header or metadata row separates runs too.
+                try flushRun()
+                continue
+            }
+            switch line.kind {
+            case .deletion:
+                try flushRun()
+                deletionRun.append(line)
+            case .addition:
+                additionRun.append(line)
+            case .context:
+                try flushRun()
+            }
+        }
+        try flushRun()
+        return result
+    }
+
+    private static func wordRanges(
+        for segments: [GitLabDiffWordSegment],
+        kind: GitLabDiffLineKind,
+        absoluteRange: NSRange
+    ) -> [(
+        range: NSRange,
+        kind: GitLabDiffLineKind
+    )] {
+        var ranges: [(
+            range: NSRange,
+            kind: GitLabDiffLineKind
+        )] = []
+        ranges.reserveCapacity(segments.count)
+        var offset = absoluteRange.location
+        for segment in segments {
+            let length = segment.text.utf16.count
+            if segment.kind == .changed {
+                ranges.append(
+                    (
+                        range: NSRange(
+                            location: offset,
+                            length: length
+                        ),
+                        kind: kind
+                    )
+                )
+            }
+            offset += length
+        }
+        return ranges
     }
 
     private func highlightedLines(

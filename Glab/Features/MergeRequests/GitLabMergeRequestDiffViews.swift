@@ -32,6 +32,10 @@ struct GitLabMergeRequestDiffListView: View {
     let changesURL: URL?
     let diffVersion:
         GitLabMergeRequestDiffVersionIdentity?
+    let approvalManagementModel:
+        GitLabMergeRequestApprovalManagementModel
+    let mergeModel:
+        GitLabMergeRequestMergeModel
     let discussionModel:
         GitLabDiscussionsModel
     let resolutionModel:
@@ -59,6 +63,10 @@ struct GitLabMergeRequestDiffListView: View {
         diffVersion:
             GitLabMergeRequestDiffVersionIdentity?,
         loader: any GitLabMergeRequestDiffLoading,
+        approvalManagementModel:
+            GitLabMergeRequestApprovalManagementModel,
+        mergeModel:
+            GitLabMergeRequestMergeModel,
         discussionModel:
             GitLabDiscussionsModel,
         resolutionModel:
@@ -76,6 +84,9 @@ struct GitLabMergeRequestDiffListView: View {
         self.headSHA = headSHA
         self.changesURL = changesURL
         self.diffVersion = diffVersion
+        self.approvalManagementModel =
+            approvalManagementModel
+        self.mergeModel = mergeModel
         self.discussionModel =
             discussionModel
         self.resolutionModel =
@@ -244,6 +255,10 @@ struct GitLabMergeRequestDiffListView: View {
                                 changesURL: changesURL,
                                 diffVersion:
                                     diffVersion,
+                                approvalManagementModel:
+                                    approvalManagementModel,
+                                mergeModel:
+                                    mergeModel,
                                 discussionModel:
                                     discussionModel,
                                 resolutionModel:
@@ -454,6 +469,12 @@ private struct GitLabMergeRequestDiffFileRow: View {
                         color: kindColor
                     )
 
+                    if file.availability == .available {
+                        GitLabDiffLineChangesBadge(
+                            changes: file.lineChanges
+                        )
+                    }
+
                     if file.isGeneratedFile {
                         GitLabDiffBadge(
                             title: "Generated",
@@ -568,6 +589,39 @@ private struct GitLabDiffBadge: View {
     }
 }
 
+private struct GitLabDiffLineChangesBadge: View {
+    let changes: GitLabLineChanges
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("+\(changes.additions)")
+                .foregroundStyle(.green)
+            Text("−\(changes.deletions)")
+                .foregroundStyle(.red)
+        }
+        .font(
+            .glabCaption2
+                .weight(.semibold)
+                .monospacedDigit()
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(changes.additions) "
+                + (
+                    changes.additions == 1
+                        ? "addition"
+                        : "additions"
+                )
+                + ", \(changes.deletions) "
+                + (
+                    changes.deletions == 1
+                        ? "deletion"
+                        : "deletions"
+                )
+        )
+    }
+}
+
 private struct GitLabMergeRequestDiffFileView: View {
     let filesModel: GitLabMergeRequestDiffsModel
     let route: GitLabMergeRequestRoute
@@ -575,6 +629,10 @@ private struct GitLabMergeRequestDiffFileView: View {
     let changesURL: URL?
     let diffVersion:
         GitLabMergeRequestDiffVersionIdentity?
+    let approvalManagementModel:
+        GitLabMergeRequestApprovalManagementModel
+    let mergeModel:
+        GitLabMergeRequestMergeModel
     let discussionModel:
         GitLabDiscussionsModel
     let resolutionModel:
@@ -588,6 +646,7 @@ private struct GitLabMergeRequestDiffFileView: View {
         any GitLabEmojiReactionLoading
             & GitLabEmojiReactionMutating
     let accountID: GitLabAccountID
+    let renderer: any GitLabDiffRendering
     let appSession: AppSession
 
     @State private var selectedFileID:
@@ -599,6 +658,8 @@ private struct GitLabMergeRequestDiffFileView: View {
         GitLabDiffLineSelection?
     @State private var showsAllDiscussions =
         false
+    @State private var showsGeneralComposer =
+        false
 
     init(
         filesModel: GitLabMergeRequestDiffsModel,
@@ -609,6 +670,10 @@ private struct GitLabMergeRequestDiffFileView: View {
         changesURL: URL?,
         diffVersion:
             GitLabMergeRequestDiffVersionIdentity?,
+        approvalManagementModel:
+            GitLabMergeRequestApprovalManagementModel,
+        mergeModel:
+            GitLabMergeRequestMergeModel,
         discussionModel:
             GitLabDiscussionsModel,
         resolutionModel:
@@ -630,6 +695,9 @@ private struct GitLabMergeRequestDiffFileView: View {
         self.headSHA = headSHA
         self.changesURL = changesURL
         self.diffVersion = diffVersion
+        self.approvalManagementModel =
+            approvalManagementModel
+        self.mergeModel = mergeModel
         self.discussionModel =
             discussionModel
         self.resolutionModel =
@@ -642,6 +710,7 @@ private struct GitLabMergeRequestDiffFileView: View {
         self.reactionService =
             reactionService
         self.accountID = accountID
+        self.renderer = renderer
         self.appSession = appSession
         _selectedFileID = State(
             initialValue: initialFileID
@@ -677,6 +746,44 @@ private struct GitLabMergeRequestDiffFileView: View {
         .background(
             Color.glabSurface
         )
+        .safeAreaInset(
+            edge: .bottom,
+            spacing: 0
+        ) {
+            GitLabDiffReviewBottomBar(
+                approvalManagementModel:
+                    approvalManagementModel,
+                mergeModel: mergeModel,
+                apiAccess: apiAccess,
+                startComment: {
+                    showsGeneralComposer = true
+                }
+            )
+        }
+        .sheet(
+            isPresented:
+                $showsGeneralComposer
+        ) {
+            GitLabDiscussionComposerView(
+                accountID: accountID,
+                resource: .mergeRequest(
+                    route
+                ),
+                target: .newDiscussion,
+                apiAccess: apiAccess,
+                mutator: discussionMutator,
+                draftStore: appSession
+                    .discussionDraftStore,
+                appSession: appSession,
+                onSuccess: reconcile
+            )
+            .presentationDetents([
+                .medium, .large,
+            ])
+            .presentationDragIndicator(
+                .visible
+            )
+        }
         .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -893,6 +1000,11 @@ private struct GitLabMergeRequestDiffFileView: View {
                     title: fileKindTitle(file),
                     color: fileKindColor(file)
                 )
+                if file.availability == .available {
+                    GitLabDiffLineChangesBadge(
+                        changes: file.lineChanges
+                    )
+                }
                 if file.isGeneratedFile {
                     GitLabDiffBadge(
                         title: "Generated",

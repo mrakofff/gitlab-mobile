@@ -46,6 +46,7 @@ struct GitLabDiffLineDiscussionSheet: View {
                 },
             newPosition:
                 selection.position,
+            startsExpanded: true,
             resource: resource,
             accountID: accountID,
             webURL: webURL,
@@ -89,6 +90,7 @@ struct GitLabAllDiffDiscussionsSheet: View {
                 + "Outdated or unavailable positions remain accessible here.",
             entries: entries,
             newPosition: nil,
+            startsExpanded: false,
             resource: resource,
             accountID: accountID,
             webURL: webURL,
@@ -136,6 +138,9 @@ private struct GitLabDiffDiscussionSheet:
     let entries:
         [GitLabDiffDiscussionSheetEntry]
     let newPosition: GitLabDiffLinePosition?
+    /// Line sheets show every thread expanded so Resolve and Reply work
+    /// in place; the aggregated all-discussions sheet keeps them folded.
+    let startsExpanded: Bool
     let resource: GitLabDiscussionResource
     let accountID: GitLabAccountID
     let webURL: URL?
@@ -207,6 +212,8 @@ private struct GitLabDiffDiscussionSheet:
                                     resolutionModel,
                                 appSession:
                                     appSession,
+                                startsExpanded:
+                                    startsExpanded,
                                 reply:
                                     replyAction(
                                         for:
@@ -335,9 +342,51 @@ private struct GitLabCollapsedDiffDiscussion:
     let resolutionModel:
         GitLabDiscussionResolutionModel
     let appSession: AppSession
+    let startsExpanded: Bool
     let reply: (() -> Void)?
 
-    @State private var isExpanded = false
+    @State private var isExpanded: Bool
+
+    init(
+        entry:
+            GitLabDiffDiscussionSheetEntry,
+        resource: GitLabDiscussionResource,
+        accountID: GitLabAccountID,
+        webURL: URL?,
+        markdownRenderer:
+            any GitLabMarkdownRendering,
+        apiAccess: GitLabAPIAccess,
+        model: GitLabDiscussionsModel,
+        mutator: any GitLabDiscussionMutating,
+        reactionService:
+            any GitLabEmojiReactionLoading
+                & GitLabEmojiReactionMutating,
+        resolutionModel:
+            GitLabDiscussionResolutionModel,
+        appSession: AppSession,
+        startsExpanded: Bool,
+        reply: (() -> Void)?
+    ) {
+        self.entry = entry
+        self.resource = resource
+        self.accountID = accountID
+        self.webURL = webURL
+        self.markdownRenderer =
+            markdownRenderer
+        self.apiAccess = apiAccess
+        self.model = model
+        self.mutator = mutator
+        self.reactionService =
+            reactionService
+        self.resolutionModel =
+            resolutionModel
+        self.appSession = appSession
+        self.startsExpanded = startsExpanded
+        self.reply = reply
+        _isExpanded = State(
+            initialValue: startsExpanded
+        )
+    }
 
     var body: some View {
         VStack(

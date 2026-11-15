@@ -2096,6 +2096,9 @@ private struct GitLabMergeRequestDetailContent: View {
                         diffSummaryLoader,
                     diffLoader:
                         diffLoader,
+                    approvalManagementModel:
+                        approvalManagementModel,
+                    mergeModel: mergeModel,
                     discussionModel:
                         discussionModel,
                     resolutionModel:
@@ -2261,6 +2264,10 @@ private struct
     let headSHA: String
     let diffLoader:
         any GitLabMergeRequestDiffLoading
+    let approvalManagementModel:
+        GitLabMergeRequestApprovalManagementModel
+    let mergeModel:
+        GitLabMergeRequestMergeModel
     let discussionModel:
         GitLabDiscussionsModel
     let resolutionModel:
@@ -2284,6 +2291,10 @@ private struct
             any GitLabMergeRequestDiffSummaryLoading,
         diffLoader:
             any GitLabMergeRequestDiffLoading,
+        approvalManagementModel:
+            GitLabMergeRequestApprovalManagementModel,
+        mergeModel:
+            GitLabMergeRequestMergeModel,
         discussionModel:
             GitLabDiscussionsModel,
         resolutionModel:
@@ -2300,6 +2311,9 @@ private struct
         self.mergeRequest = mergeRequest
         self.headSHA = headSHA
         self.diffLoader = diffLoader
+        self.approvalManagementModel =
+            approvalManagementModel
+        self.mergeModel = mergeModel
         self.discussionModel =
             discussionModel
         self.resolutionModel =
@@ -2334,6 +2348,9 @@ private struct
                         .diffRefs?
                         .identity,
                 loader: diffLoader,
+                approvalManagementModel:
+                    approvalManagementModel,
+                mergeModel: mergeModel,
                 discussionModel:
                     discussionModel,
                 resolutionModel:
