@@ -1,6 +1,6 @@
 # Задача: Фаза 10 — Shell (Home/Inbox/Search) + поиск users + Inbox empty-state
 
-**Статус:** open
+**Статус:** done (коммит 4e26078, смёржено в main 2026-11-15)
 **План:** ~/.claude/plans/composed-forging-volcano.md — «Дополнение (2026-11-14)»
 **Создана:** 2026-11-14
 **Референс:** /Users/andrei/glab-reference r05, r20 (NOTES.md)
