@@ -665,11 +665,25 @@ private struct SelfManagedGitLabOAuthView: View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 12) {
                 Text(
-                    "Register Glab as a public, non-confidential OAuth "
+                    "Register GitLab Mobile as a public, non-confidential OAuth "
                         + "application with the api scope."
                 )
 
-                LabeledContent("Redirect URI") {
+                LabeledContent {
+                    Button {
+                        UIPasteboard.general.string = model.redirectURI
+                    } label: {
+                        Label(
+                            "Copy",
+                            systemImage: "doc.on.doc"
+                        )
+                        .font(.caption.weight(.semibold))
+                        .labelStyle(.titleAndIcon)
+                    }
+                    .buttonStyle(.glass)
+                    .accessibilityLabel("Copy redirect URI")
+                    .accessibilityIdentifier("oauth.copyRedirectURI")
+                } label: {
                     Text(model.redirectURI)
                         .font(.caption.monospaced())
                         .textSelection(.enabled)
