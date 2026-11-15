@@ -259,6 +259,7 @@ struct GitLabProjectActionItem: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
+        .frame(minHeight: 80)
         .glassEffect(
             .regular
                 .tint(tint.opacity(0.12))

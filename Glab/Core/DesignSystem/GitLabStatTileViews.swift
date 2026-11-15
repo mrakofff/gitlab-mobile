@@ -28,6 +28,7 @@ struct GitLabStatTile<Icon: View>: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
+        .frame(minHeight: 80)
         .glassEffect(
             .regular.tint(tint.opacity(0.12)).interactive(),
             in: .rect(cornerRadius: 16)
