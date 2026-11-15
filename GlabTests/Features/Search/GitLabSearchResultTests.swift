@@ -132,6 +132,46 @@ struct GitLabSearchResultTests {
         )
     }
 
+    @Test("Decodes a sparse user search result and routes to the profile")
+    func decodesUser() throws {
+        let result = try decodeResult(
+            """
+            {
+              "id": 77,
+              "username": "ada",
+              "name": "Ada Lovelace",
+              "avatar_url": "https://gitlab.example.com/avatar.png",
+              "web_url": "https://gitlab.example.com/ada",
+              "state": "active",
+              "unknown_future_field": true
+            }
+            """
+        )
+
+        guard case let .user(user) = result else {
+            Issue.record("Expected a user search result")
+            return
+        }
+
+        #expect(user.id == 77)
+        #expect(user.username == "ada")
+        #expect(user.name == "Ada Lovelace")
+        #expect(
+            result.nativeRoute == .user(
+                GitLabUserRoute(
+                    id: 77,
+                    username: "ada",
+                    name: "Ada Lovelace",
+                    avatarURL: URL(
+                        string:
+                            "https://gitlab.example.com/avatar.png"
+                    )
+                )
+            )
+        )
+        #expect(result.scope == .users)
+    }
+
     @Test("Includes the account in stable search result identity")
     func includesAccountInIdentity() throws {
         let firstAccount = GitLabAccountID(
@@ -256,6 +296,15 @@ private extension GitLabSearchResultTests {
             return .issue(
                 try decoder.decode(
                     GitLabIssueSearchResult.self,
+                    from: Data(json.utf8)
+                )
+            )
+        }
+
+        if json.contains(#""username""#) {
+            return .user(
+                try decoder.decode(
+                    GitLabAPIUser.self,
                     from: Data(json.utf8)
                 )
             )

@@ -1,6 +1,25 @@
 import Foundation
 
 nonisolated enum GitLabUserEndpoints {
+    static func search(
+        query: String
+    ) -> GitLabAPIRequest<[GitLabAPIUser]> {
+        .get(
+            requires: .read,
+            path: ["users"],
+            query: [
+                URLQueryItem(
+                    name: "search",
+                    value: query
+                ),
+                URLQueryItem(
+                    name: "per_page",
+                    value: "20"
+                ),
+            ]
+        )
+    }
+
     static func profile(
         userID: Int
     ) -> GitLabAPIRequest<GitLabUserProfile> {

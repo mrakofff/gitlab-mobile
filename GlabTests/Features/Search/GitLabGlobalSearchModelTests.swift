@@ -49,7 +49,7 @@ struct GitLabGlobalSearchModelTests {
     @Test("Loads all first-page scopes concurrently")
     func loadsConcurrently() async throws {
         let gate = SearchConcurrencyGate(
-            expectedStarts: 3
+            expectedStarts: 4
         )
         let model = try makeModel(
             loader: ScriptedSearchLoader {
@@ -75,7 +75,7 @@ struct GitLabGlobalSearchModelTests {
         }
         await gate.waitUntilExpectedStarted()
 
-        #expect(await gate.maximumActive == 3)
+        #expect(await gate.maximumActive == 4)
 
         await gate.releaseAll()
         await search.value
@@ -95,7 +95,7 @@ struct GitLabGlobalSearchModelTests {
     @Test("A late cancelled query cannot replace the current results")
     func rejectsLateStaleResults() async throws {
         let oldQueryGate = SearchConcurrencyGate(
-            expectedStarts: 3
+            expectedStarts: 4
         )
         let model = try makeModel(
             loader: ScriptedSearchLoader {
@@ -168,6 +168,8 @@ struct GitLabGlobalSearchModelTests {
                         .api(
                             .server(statusCode: 500)
                         )
+                case .users:
+                    return page(for: scope)
                 }
             }
         )
@@ -703,6 +705,16 @@ private nonisolated func page(
                     webURL: nil
                 )
             )
+        case .users:
+            .user(
+                GitLabAPIUser(
+                    id: 301,
+                    username: "result",
+                    name: title,
+                    avatarURL: nil,
+                    webURL: nil
+                )
+            )
         }
 
     return GitLabSearchPage(
@@ -744,6 +756,8 @@ private nonisolated func titles(
             issue.title
         case let .mergeRequest(mergeRequest):
             mergeRequest.title
+        case let .user(user):
+            user.name
         }
     }
 }

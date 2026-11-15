@@ -500,6 +500,8 @@ private extension GitLabSearchScope {
             "Issues"
         case .mergeRequests:
             "Merge Requests"
+        case .users:
+            "Users"
         }
     }
 
@@ -511,6 +513,8 @@ private extension GitLabSearchScope {
             .workItemIssue
         case .mergeRequests:
             .mergeRequest
+        case .users:
+            .group
         }
     }
 
@@ -530,6 +534,8 @@ private extension GitLabSearchResult {
             .workItemIssue
         case .mergeRequest:
             .mergeRequest
+        case .user:
+            .group
         }
     }
 
@@ -544,6 +550,8 @@ private extension GitLabSearchResult {
             mergeRequest
         ):
             mergeRequest.title
+        case let .user(user):
+            user.displayName
         }
     }
 
@@ -576,6 +584,8 @@ private extension GitLabSearchResult {
             ]
             .compactMap(\.self)
             .joined(separator: "  •  ")
+        case let .user(user):
+            "@\(user.username)"
         }
     }
 
