@@ -2,6 +2,8 @@ import SwiftUI
 
 struct TodosView: View {
     let model: TodosModel
+    var screenTitle: String = "Todos"
+    var usesInboxEmptyState = false
     let issueLoader: any GitLabIssueLoading
     let mergeRequestLoader:
         any GitLabMergeRequestLoading
@@ -76,7 +78,7 @@ struct TodosView: View {
             .listStyle(.plain)
             .accessibilityIdentifier("todos.list")
             .background(Color.glabSurface)
-            .navigationTitle("Todos")
+            .navigationTitle(screenTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if model.selectedState == .pending {
@@ -260,17 +262,33 @@ struct TodosView: View {
             model.todos.isEmpty,
             model.hasLoaded
         {
-            GitLabEmptyStateView(
-                title: emptyTitle,
-                message: emptyMessage,
-                gitLabIcon:
-                    model.selectedState == .pending
-                    ? .todoAdd
-                    : .todoDone
-            )
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 430)
-            .listRowSeparator(.hidden)
+            if usesInboxEmptyState,
+                model.selectedState == .pending,
+                model.selectedTargetFilter == .all
+            {
+                GitLabEmptyStateView(
+                    title: "All caught up",
+                    message:
+                        "Your GitLab todos inbox is empty. "
+                            + "Pull down to refresh.",
+                    gitLabIcon: .todoDone
+                )
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 430)
+                .listRowSeparator(.hidden)
+            } else {
+                GitLabEmptyStateView(
+                    title: emptyTitle,
+                    message: emptyMessage,
+                    gitLabIcon:
+                        model.selectedState == .pending
+                        ? .todoAdd
+                        : .todoDone
+                )
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 430)
+                .listRowSeparator(.hidden)
+            }
         } else {
             if
                 model.didFailRefresh,
@@ -440,7 +458,7 @@ struct TodosView: View {
         [
             model.selectedState.title.lowercased(),
             targetDescription,
-            "Todos",
+            screenTitle,
         ]
         .joined(separator: " ")
     }

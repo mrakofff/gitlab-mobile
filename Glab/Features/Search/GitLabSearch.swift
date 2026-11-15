@@ -10,6 +10,7 @@ nonisolated enum GitLabSearchScope:
     case projects
     case issues
     case mergeRequests
+    case users
 
     var apiValue: String {
         switch self {
@@ -19,6 +20,8 @@ nonisolated enum GitLabSearchScope:
             "issues"
         case .mergeRequests:
             "merge_requests"
+        case .users:
+            "users"
         }
     }
 }
@@ -372,6 +375,7 @@ nonisolated enum GitLabSearchResult:
     case mergeRequest(
         GitLabMergeRequestSearchResult
     )
+    case user(GitLabAPIUser)
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(
@@ -397,6 +401,12 @@ nonisolated enum GitLabSearchResult:
                     from: decoder
                 )
             )
+        } else if container.contains(
+            .username
+        ) {
+            self = .user(try GitLabAPIUser(
+                from: decoder
+            ))
         } else {
             self = .issue(
                 try GitLabIssueSearchResult(
@@ -414,6 +424,8 @@ nonisolated enum GitLabSearchResult:
             .issue(issue.route)
         case let .mergeRequest(mergeRequest):
             .mergeRequest(mergeRequest.route)
+        case let .user(user):
+            .user(user.id)
         }
     }
 
@@ -425,6 +437,8 @@ nonisolated enum GitLabSearchResult:
             .issues
         case .mergeRequest:
             .mergeRequests
+        case .user:
+            .users
         }
     }
 
@@ -445,6 +459,8 @@ nonisolated enum GitLabSearchResult:
             .mergeRequest(
                 mergeRequest.route
             )
+        case let .user(user):
+            .user(GitLabUserRoute(user: user))
         }
     }
 
@@ -459,6 +475,8 @@ nonisolated enum GitLabSearchResult:
                 mergeRequest
             ):
                 mergeRequest.description
+            case .user:
+                nil
             }
 
         return Self.makeSummaryPreview(
@@ -528,6 +546,7 @@ nonisolated enum GitLabSearchResult:
         case draft
         case legacyWorkInProgress =
             "work_in_progress"
+        case username
     }
 }
 
@@ -539,6 +558,7 @@ nonisolated enum GitLabSearchResourceID:
     case project(Int)
     case issue(GitLabIssueRoute)
     case mergeRequest(GitLabMergeRequestRoute)
+    case user(Int)
 }
 
 nonisolated struct GitLabSearchResultID:

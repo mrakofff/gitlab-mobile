@@ -25,6 +25,23 @@ struct GitLabUserEndpointTests {
         }
     }
 
+    @Test("Builds user search requests")
+    func buildsSearchRequests() throws {
+        let endpoint = GitLabUserEndpoints.search(
+            query: "ada lovelace"
+        )
+        let request = try request(endpoint)
+
+        #expect(endpoint.method == .get)
+        #expect(endpoint.requiredAccess == .read)
+        #expect(endpoint.pathComponents == ["users"])
+        #expect(
+            request.url?.absoluteString
+                == "https://gitlab.example.com/api/v4/users"
+                    + "?search=ada%20lovelace&per_page=20"
+        )
+    }
+
     @Test("Builds user status and GPG key requests")
     func buildsAuxiliaryRequests() throws {
         let status = GitLabUserEndpoints.status(

@@ -9,9 +9,30 @@ nonisolated enum GitLabAppTab:
 {
     case home
     case inbox
-    case todos
+    case search
 
     static let defaultTab = Self.home
+
+    /// DEBUG-only launch override (`-app_tab_fixture=inbox|search`)
+    /// used to screenshot tab surfaces without interaction tools.
+    static let debugLaunchTab: Self? = {
+        #if DEBUG
+        guard
+            let argument = ProcessInfo.processInfo.arguments
+                .first(where: { $0.hasPrefix("-app_tab_fixture=") }),
+            let tab = argument
+                .split(separator: "=", maxSplits: 1)
+                .last
+                .map(String.init)
+                .flatMap(GitLabAppTab.init(rawValue:))
+        else {
+            return nil
+        }
+        return tab
+        #else
+        return nil
+        #endif
+    }()
 
     var title: String {
         switch self {
@@ -19,8 +40,8 @@ nonisolated enum GitLabAppTab:
             "Home"
         case .inbox:
             "Inbox"
-        case .todos:
-            "Todos"
+        case .search:
+            "Search"
         }
     }
 
@@ -30,8 +51,8 @@ nonisolated enum GitLabAppTab:
             "house.fill"
         case .inbox:
             "tray.fill"
-        case .todos:
-            "checklist"
+        case .search:
+            "magnifyingglass"
         }
     }
 }
@@ -47,7 +68,9 @@ struct SignedInShellView: View {
     private let accountID: GitLabAccountID
     @Environment(GitLabTodoNotificationRouteModel.self)
     private var todoNotificationRouteModel
-    @State private var selectedTab = GitLabAppTab.defaultTab
+    @State private var selectedTab =
+        GitLabAppTab.debugLaunchTab
+            ?? GitLabAppTab.defaultTab
     @State private var homeDashboardModel: HomeDashboardModel
     @State private var assignedIssuesModel: AssignedIssuesModel
     @State private var createdIssuesModel: IssuesModel
@@ -104,6 +127,7 @@ struct SignedInShellView: View {
         any GitLabMergeRequestCreationServing
     private let mentionService:
         any GitLabMentionSearching
+    private let searchLoader: any GitLabSearchLoading
     private let projectLoader:
         any GitLabProjectLoading
             & GitLabProjectResolving
@@ -252,6 +276,9 @@ struct SignedInShellView: View {
             LiveGitLabMentionService(
                 client: client
             )
+        let searchLoader = LiveGitLabSearchLoader(
+            client: client
+        )
         let todoService = LiveGitLabTodoLoader(
             client: client
         )
@@ -280,6 +307,7 @@ struct SignedInShellView: View {
             mergeRequestCreationService
         self.mentionService =
             mentionService
+        self.searchLoader = searchLoader
         self.projectLoader = projectLoader
         self.projectStarringService =
             projectStarringService
@@ -499,7 +527,7 @@ struct SignedInShellView: View {
                         incomingLinkModel.clear()
                     },
                     onShowTodos: {
-                        selectedTab = .todos
+                        selectedTab = .inbox
                     }
                 )
             } label: {
@@ -512,19 +540,10 @@ struct SignedInShellView: View {
             }
 
             Tab(value: GitLabAppTab.inbox) {
-                GitLabInboxPlaceholderView()
-            } label: {
-                Label(
-                    GitLabAppTab.inbox.title,
-                    systemImage:
-                        GitLabAppTab.inbox.systemImage
-                )
-                .accessibilityIdentifier("tab.inbox")
-            }
-
-            Tab(value: GitLabAppTab.todos) {
                 TodosView(
                     model: todosModel,
+                    screenTitle: "Inbox",
+                    usesInboxEmptyState: true,
                     issueLoader: issueLoader,
                     mergeRequestLoader:
                         mergeRequestLoader,
@@ -551,13 +570,64 @@ struct SignedInShellView: View {
                 )
             } label: {
                 Label(
-                    GitLabAppTab.todos.title,
+                    GitLabAppTab.inbox.title,
                     systemImage:
-                        GitLabAppTab.todos.systemImage
+                        GitLabAppTab.inbox.systemImage
                 )
-                .accessibilityIdentifier("tab.todos")
+                .accessibilityIdentifier("tab.inbox")
             }
             .badge(todosModel.pendingBadgeCount ?? 0)
+
+            Tab(value: GitLabAppTab.search) {
+                GitLabSearchTabView(
+                    session: session,
+                    accountID: accountID,
+                    appSession: appSession,
+                    searchModel: globalSearchModel,
+                    searchLoader: searchLoader,
+                    projectLoader: projectLoader,
+                    projectStarringService:
+                        projectStarringService,
+                    userService: userService,
+                    issueLoader: issueLoader,
+                    mergeRequestLoader:
+                        mergeRequestLoader,
+                    mergeRequestApprovalService:
+                        mergeRequestApprovalService,
+                    mergeRequestMergeService:
+                        mergeRequestMergeService,
+                    pipelineLoader:
+                        pipelineLoader,
+                    discussionLoader:
+                        discussionLoader,
+                    discussionMutator:
+                        discussionMutator,
+                    reactionService:
+                        reactionService,
+                    editService:
+                        resourceEditService,
+                    issueStatusService:
+                        issueStatusService,
+                    mergeRequestCreationService:
+                        mergeRequestCreationService,
+                    commitLoader: commitLoader,
+                    repositoryLoader:
+                        repositoryLoader,
+                    overviewLoader:
+                        projectOverviewLoader,
+                    issueCreationService:
+                        issueCreationService,
+                    onResourceEdited:
+                        reconcileEditedResource
+                )
+            } label: {
+                Label(
+                    GitLabAppTab.search.title,
+                    systemImage:
+                        GitLabAppTab.search.systemImage
+                )
+                .accessibilityIdentifier("tab.search")
+            }
         }
         .environment(
             \.gitLabMarkdownRenderer,
@@ -688,7 +758,7 @@ struct SignedInShellView: View {
             return
         }
 
-        selectedTab = .todos
+        selectedTab = .inbox
         await todosModel.refresh()
         guard !Task.isCancelled else {
             return
@@ -927,24 +997,3 @@ struct SignedInShellView: View {
     }
 }
 
-private struct GitLabInboxPlaceholderView: View {
-    var body: some View {
-        NavigationStack {
-            GitLabEmptyStateView(
-                title: "Inbox",
-                message:
-                    "Mentions, reviews, and assignments in one place. "
-                    + "Coming soon.",
-                systemImage: "tray"
-            )
-            .frame(
-                maxWidth: .infinity,
-                maxHeight: .infinity
-            )
-            .background(Color.glabCanvas)
-            .navigationTitle("Inbox")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-        .accessibilityIdentifier("inbox.placeholder")
-    }
-}
