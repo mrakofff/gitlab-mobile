@@ -23,7 +23,7 @@ struct GitLabContentLinkTests {
         let wrapped = try #require(
             URL(
                 string:
-                    "glab://open?url="
+                    "glab-mobile://open?url="
                     + encodedTarget
             )
         )
@@ -43,16 +43,16 @@ struct GitLabContentLinkTests {
     @Test("Rejects malformed wrappers and the OAuth callback")
     func rejectsInvalidWrappers() throws {
         let urls = try [
-            "glab://oauth/callback?code=secret&state=state",
-            "glab://wrong?url=https%3A%2F%2Fgitlab.com%2Fg%2Fp",
-            "glab://open/path?url=https%3A%2F%2Fgitlab.com%2Fg%2Fp",
-            "glab://open",
-            "glab://open?other=https%3A%2F%2Fgitlab.com%2Fg%2Fp",
-            "glab://open?url=https%3A%2F%2Fgitlab.com%2Fg%2Fp"
+            "glab-mobile://oauth/callback?code=secret&state=state",
+            "glab-mobile://wrong?url=https%3A%2F%2Fgitlab.com%2Fg%2Fp",
+            "glab-mobile://open/path?url=https%3A%2F%2Fgitlab.com%2Fg%2Fp",
+            "glab-mobile://open",
+            "glab-mobile://open?other=https%3A%2F%2Fgitlab.com%2Fg%2Fp",
+            "glab-mobile://open?url=https%3A%2F%2Fgitlab.com%2Fg%2Fp"
                 + "&url=https%3A%2F%2Fgitlab.com%2Fother%2Fp",
-            "glab://open?url=http%3A%2F%2Fgitlab.com%2Fg%2Fp",
-            "glab://open?url=glab%3A%2F%2Fopen",
-            "glab://open?url=https%3A%2F%2Fuser%3Apass"
+            "glab-mobile://open?url=http%3A%2F%2Fgitlab.com%2Fg%2Fp",
+            "glab-mobile://open?url=glab%3A%2F%2Fopen",
+            "glab-mobile://open?url=https%3A%2F%2Fuser%3Apass"
                 + "%40gitlab.com%2Fg%2Fp",
             "https://user:pass@gitlab.com/g/p",
         ].map {

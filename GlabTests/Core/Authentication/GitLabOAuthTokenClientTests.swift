@@ -79,7 +79,7 @@ struct GitLabOAuthTokenClientTests {
 
         #expect(form["grant_type"] == "refresh_token")
         #expect(form["refresh_token"] == "refresh-one")
-        #expect(form["redirect_uri"] == "glab://oauth/callback")
+        #expect(form["redirect_uri"] == "glab-mobile://oauth/callback")
         #expect(form["client_secret"] == nil)
     }
 

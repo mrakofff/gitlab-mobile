@@ -22,7 +22,7 @@ nonisolated enum GitLabContentLink {
         }
 
         guard
-            scheme == "glab",
+            scheme == "glab-mobile",
             components.host?
                 .lowercased() == "open",
             components.port == nil,

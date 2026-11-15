@@ -132,7 +132,7 @@ struct GitLabClipboardLinkClassifierTests {
         let wrappedURL = try #require(
             URL(
                 string:
-                    "glab://open?url=https%3A%2F%2F"
+                    "glab-mobile://open?url=https%3A%2F%2F"
                     + "gitlab.com%2Fgroup%2Fproject%2F-%2F"
                     + "merge_requests%2F9"
             )

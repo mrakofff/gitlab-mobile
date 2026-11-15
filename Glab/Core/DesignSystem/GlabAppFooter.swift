@@ -7,21 +7,25 @@ struct GlabAppFooter: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
 
-            Text("Made with ❤️ by Nitesh")
+            Text("Made with ❤️ by")
                 .font(.glabCaption)
                 .foregroundStyle(.secondary)
 
             Link(destination: repositoryURL) {
-                Image("GitHubMark")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 22, height: 22)
+                Text(repositoryOwner)
+                    .font(.glabCaption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .underline()
             }
-            .buttonStyle(.glass)
-            .foregroundStyle(.primary)
-            .accessibilityLabel("View Glab on GitHub")
+            .accessibilityLabel("View GitLab Mobile on GitHub")
             .accessibilityIdentifier("app.githubLink")
         }
+    }
+
+    /// Shown in the footer; kept in one place so rebranding touches a
+    /// single constant.
+    private var repositoryOwner: String {
+        "Mrakoff"
     }
 
     private var appVersion: String {
@@ -31,6 +35,6 @@ struct GlabAppFooter: View {
     }
 
     private var repositoryURL: URL {
-        URL(string: "https://github.com/smolcars/glab-ios")!
+        URL(string: "https://github.com/mrakofff/gitlab-mobile")!
     }
 }

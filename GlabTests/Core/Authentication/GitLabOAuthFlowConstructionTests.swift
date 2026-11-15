@@ -101,7 +101,7 @@ struct GitLabOAuthFlowConstructionTests {
         )
         #expect(configuration.applicationID == "public-app-id")
         #expect(authorizationQuery["client_id"] == "public-app-id")
-        #expect(authorizationQuery["redirect_uri"] == "glab://oauth/callback")
+        #expect(authorizationQuery["redirect_uri"] == "glab-mobile://oauth/callback")
         #expect(authorizationQuery["response_type"] == "code")
         #expect(authorizationQuery["state"] == "secure_state")
         #expect(authorizationQuery["scope"] == "api")
@@ -123,7 +123,7 @@ struct GitLabOAuthFlowConstructionTests {
         #expect(tokenForm["client_id"] == "public-app-id")
         #expect(tokenForm["code"] == "returned-code")
         #expect(tokenForm["grant_type"] == "authorization_code")
-        #expect(tokenForm["redirect_uri"] == "glab://oauth/callback")
+        #expect(tokenForm["redirect_uri"] == "glab-mobile://oauth/callback")
         #expect(tokenForm["code_verifier"] == pkce.codeVerifier)
         #expect(tokenForm["client_secret"] == nil)
     }
@@ -167,7 +167,7 @@ struct GitLabOAuthFlowConstructionTests {
 
         let code = try configuration.authorizationCode(
             from: try #require(
-                URL(string: "glab://oauth/callback?code=code-123&state=state-123")
+                URL(string: "glab-mobile://oauth/callback?code=code-123&state=state-123")
             ),
             expectedState: "state-123"
         )
@@ -177,7 +177,7 @@ struct GitLabOAuthFlowConstructionTests {
             try configuration.authorizationCode(
                 from: try #require(
                     URL(
-                        string: "glab://oauth/callback?code=code-123&state=wrong"
+                        string: "glab-mobile://oauth/callback?code=code-123&state=wrong"
                     )
                 ),
                 expectedState: "state-123"
@@ -187,7 +187,7 @@ struct GitLabOAuthFlowConstructionTests {
             try configuration.authorizationCode(
                 from: try #require(
                     URL(
-                        string: "glab://oauth/callback?error=access_denied&state=state-123"
+                        string: "glab-mobile://oauth/callback?error=access_denied&state=state-123"
                     )
                 ),
                 expectedState: "state-123"

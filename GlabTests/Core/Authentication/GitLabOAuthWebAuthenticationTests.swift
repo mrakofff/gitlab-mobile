@@ -33,7 +33,7 @@ struct GitLabOAuthWebAuthenticationTests {
                 at: try #require(
                     URL(string: "https://gitlab.example.com/oauth/authorize")
                 ),
-                callbackURLScheme: "glab"
+                callbackURLScheme: "glab-mobile"
             )
         }
         await firstSession.waitUntilStarted()
@@ -47,7 +47,7 @@ struct GitLabOAuthWebAuthenticationTests {
         #expect(firstSession.cancelCount == 1)
 
         firstSession.complete(
-            callbackURL: URL(string: "glab://oauth/callback?code=late")
+            callbackURL: URL(string: "glab-mobile://oauth/callback?code=late")
         )
 
         let secondAttempt = Task {
@@ -55,12 +55,12 @@ struct GitLabOAuthWebAuthenticationTests {
                 at: try #require(
                     URL(string: "https://gitlab.example.com/oauth/authorize")
                 ),
-                callbackURLScheme: "glab"
+                callbackURLScheme: "glab-mobile"
             )
         }
         await secondSession.waitUntilStarted()
         let expectedCallback = try #require(
-            URL(string: "glab://oauth/callback?code=current")
+            URL(string: "glab-mobile://oauth/callback?code=current")
         )
         secondSession.complete(callbackURL: expectedCallback)
 
@@ -87,7 +87,7 @@ struct GitLabOAuthWebAuthenticationTests {
                 at: try #require(
                     URL(string: "https://gitlab.example.com/oauth/authorize")
                 ),
-                callbackURLScheme: "glab"
+                callbackURLScheme: "glab-mobile"
             )
         }
         #expect(factoryCallCount == 0)

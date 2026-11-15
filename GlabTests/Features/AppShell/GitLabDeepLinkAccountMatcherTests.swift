@@ -187,7 +187,7 @@ struct GitLabDeepLinkAccountMatcherTests {
         let unsafe = try #require(
             URL(
                 string:
-                    "glab://open?url=http%3A%2F%2F"
+                    "glab-mobile://open?url=http%3A%2F%2F"
                     + "gitlab.example.com%2Fgroup%2Fproject"
             )
         )

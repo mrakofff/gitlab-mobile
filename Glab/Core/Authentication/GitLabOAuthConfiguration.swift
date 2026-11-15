@@ -52,7 +52,7 @@ nonisolated enum GitLabOAuthCallbackError:
         case .applicationUnavailable:
             "This GitLab instance does not allow this OAuth application."
         case .invalidRedirectURI:
-            "The OAuth application's redirect URI must be glab://oauth/callback."
+            "The OAuth application's redirect URI must be glab-mobile://oauth/callback."
         case .authorizationFailed:
             "GitLab could not authorize Glab."
         }
@@ -60,8 +60,8 @@ nonisolated enum GitLabOAuthCallbackError:
 }
 
 nonisolated struct GitLabOAuthConfiguration: Equatable, Sendable {
-    static let callbackScheme = "glab"
-    static let redirectURIString = "glab://oauth/callback"
+    static let callbackScheme = "glab-mobile"
+    static let redirectURIString = "glab-mobile://oauth/callback"
 
     let host: GitLabHost
     let applicationID: String

@@ -31,7 +31,7 @@ nonisolated enum GitLabOAuthTokenError:
         case .applicationUnavailable:
             "This GitLab instance does not allow this OAuth application. Ask an administrator to register Glab or use an access token."
         case .invalidRequest:
-            "GitLab rejected the OAuth setup. Verify that the application is public and uses glab://oauth/callback."
+            "GitLab rejected the OAuth setup. Verify that the application is public and uses glab-mobile://oauth/callback."
         case .unsupportedResponse:
             "GitLab returned an OAuth token response that Glab could not read."
         case let .connectivity(code):

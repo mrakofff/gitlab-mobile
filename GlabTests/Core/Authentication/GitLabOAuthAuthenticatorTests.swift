@@ -40,7 +40,7 @@ struct GitLabOAuthAuthenticatorTests {
                 "https://gitlab.example.com/company/oauth/authorize?"
             )
         )
-        #expect(webAuthenticator.callbackURLScheme == "glab")
+        #expect(webAuthenticator.callbackURLScheme == "glab-mobile")
 
         let exchange = try #require(await tokenExchanger.lastExchange)
         #expect(exchange.configuration == configuration)
@@ -179,15 +179,15 @@ private extension GitLabOAuthAuthenticatorTests {
             switch outcome {
             case let .code(code):
                 return URL(
-                    string: "glab://oauth/callback?code=\(code)&state=\(state)"
+                    string: "glab-mobile://oauth/callback?code=\(code)&state=\(state)"
                 )!
             case .denied:
                 return URL(
-                    string: "glab://oauth/callback?error=access_denied&state=\(state)"
+                    string: "glab-mobile://oauth/callback?error=access_denied&state=\(state)"
                 )!
             case .stateMismatch:
                 return URL(
-                    string: "glab://oauth/callback?code=code&state=wrong"
+                    string: "glab-mobile://oauth/callback?code=code&state=wrong"
                 )!
             case .cancelled:
                 throw .cancelled
