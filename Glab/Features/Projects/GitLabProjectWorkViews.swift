@@ -28,6 +28,8 @@ struct GitLabProjectWorkSection: View {
         GitLabIssueStatusServing
     let issueCreationService: any
         GitLabIssueCreationServing
+    let mergeRequestCreationService:
+        any GitLabMergeRequestCreationServing
     let overviewLoader: any
         GitLabProjectOverviewLoading
     let apiAccess: GitLabAPIAccess
@@ -71,6 +73,11 @@ struct GitLabProjectWorkSection: View {
                             reactionService:
                                 reactionService,
                             editService: editService,
+                            apiAccess: apiAccess,
+                            branchLoader:
+                                repositoryLoader,
+                            creationService:
+                                mergeRequestCreationService,
                             accountID: accountID,
                             appSession: appSession,
                             onResourceEdited:

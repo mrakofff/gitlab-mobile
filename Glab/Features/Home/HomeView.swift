@@ -83,6 +83,8 @@ struct HomeView: View {
         any GitLabIssueStatusServing
     let issueCreationService:
         any GitLabIssueCreationServing
+    let mergeRequestCreationService:
+        any GitLabMergeRequestCreationServing
     let projectLoader:
         any GitLabProjectLoading
             & GitLabProjectResolving
@@ -510,6 +512,8 @@ struct HomeView: View {
                     issueStatusService,
                 issueCreationService:
                     issueCreationService,
+                mergeRequestCreationService:
+                    mergeRequestCreationService,
                 commitLoader:
                     commitLoader,
                 repositoryLoader:

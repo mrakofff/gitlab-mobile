@@ -115,6 +115,33 @@ final class ProjectMergeRequestsModel {
         cachedModels = [.opened: model]
     }
 
+    func reconcileCreatedMergeRequest(
+        _ mergeRequest: GitLabMergeRequest
+    ) {
+        guard
+            mergeRequest.projectID == projectID
+        else {
+            return
+        }
+        let targetState =
+            GitLabProjectMergeRequestState
+            .allCases
+            .first {
+                $0.contains(mergeRequest)
+            } ?? .opened
+        for (state, model) in cachedModels
+        where state != targetState {
+            _ = model.removeItemIfPresent(
+                mergeRequest
+            )
+        }
+        model(for: targetState)
+            .reconcileItemAtStart(
+                mergeRequest,
+                countAdjustmentIfInserted: 1
+            )
+    }
+
     func reconcileEditedMergeRequest(
         _ mergeRequest: GitLabMergeRequest
     ) {

@@ -497,6 +497,138 @@ struct GitLabMergeRequestEndpointTests {
         #expect(json["assignee_id"] == nil)
     }
 
+    @Test("Builds a write-scoped merge request creation body")
+    func buildsMergeRequestCreationBody() throws {
+        let endpoint = try GitLabMergeRequestCreationEndpoints
+            .create(
+                projectID: 42,
+                input: GitLabMergeRequestCreationInput(
+                    title: "Add glass shell",
+                    description: " Detailed story\n\n- [ ] Keep the plan",
+                    sourceBranch: "feature/glass",
+                    targetBranch: "main",
+                    removeSourceBranch: true,
+                    squash: false
+                )
+            )
+        let request = try buildRequest(endpoint)
+        let json = try jsonAnyObject(request)
+
+        #expect(endpoint.method == .post)
+        #expect(endpoint.requiredAccess == .write)
+        #expect(
+            endpoint.pathComponents == [
+                "projects",
+                "42",
+                "merge_requests",
+            ]
+        )
+        #expect(
+            request.url?.absoluteString
+                == "https://gitlab.example.com/api/v4/projects/42"
+                + "/merge_requests"
+        )
+        #expect(
+            json["title"] as? String == "Add glass shell"
+        )
+        #expect(
+            json["description"] as? String
+                == "Detailed story\n\n- [ ] Keep the plan"
+        )
+        #expect(
+            json["source_branch"] as? String
+                == "feature/glass"
+        )
+        #expect(
+            json["target_branch"] as? String == "main"
+        )
+        #expect(
+            json["remove_source_branch"] as? Bool == true
+        )
+        #expect(Set(json.keys) == [
+            "title",
+            "description",
+            "source_branch",
+            "target_branch",
+            "remove_source_branch",
+        ])
+    }
+
+    @Test(
+        "Omits unset merge request creation fields"
+    )
+    func omitsUnsetMergeRequestCreationFields()
+        throws
+    {
+        let endpoint = try GitLabMergeRequestCreationEndpoints
+            .create(
+                projectID: 42,
+                input: GitLabMergeRequestCreationInput(
+                    title: "Squashed change",
+                    description: "   ",
+                    sourceBranch: "topic",
+                    targetBranch: "main",
+                    removeSourceBranch: false,
+                    squash: true
+                )
+            )
+        let json = try jsonAnyObject(
+            buildRequest(endpoint)
+        )
+
+        #expect(json["description"] == nil)
+        #expect(json["remove_source_branch"] == nil)
+        #expect(json["squash"] as? Bool == true)
+    }
+
+    @Test(
+        "Rejects a blank merge request creation title"
+    )
+    func rejectsBlankCreationTitle() {
+        #expect(
+            throws:
+                GitLabMergeRequestCreationEndpointError
+                .emptyTitle
+        ) {
+            _ = try GitLabMergeRequestCreationEndpoints
+                .create(
+                    projectID: 42,
+                    input: GitLabMergeRequestCreationInput(
+                        title: "  \n ",
+                        description: "",
+                        sourceBranch: "topic",
+                        targetBranch: "main",
+                        removeSourceBranch: false,
+                        squash: false
+                    )
+                )
+        }
+    }
+
+    @Test(
+        "Rejects merge request creation with matching branches"
+    )
+    func rejectsMatchingCreationBranches() {
+        #expect(
+            throws:
+                GitLabMergeRequestCreationEndpointError
+                .sameSourceAndTarget
+        ) {
+            _ = try GitLabMergeRequestCreationEndpoints
+                .create(
+                    projectID: 42,
+                    input: GitLabMergeRequestCreationInput(
+                        title: "Loop",
+                        description: "",
+                        sourceBranch: "main",
+                        targetBranch: "main",
+                        removeSourceBranch: false,
+                        squash: false
+                    )
+                )
+        }
+    }
+
     @Test("Builds explicit empty merge request people arrays")
     func buildsEmptyMergeRequestPeople() throws {
         let endpoint =

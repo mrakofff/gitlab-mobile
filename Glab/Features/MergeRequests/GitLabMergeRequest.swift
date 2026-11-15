@@ -77,6 +77,7 @@ nonisolated enum GitLabProjectMergeRequestState:
 {
     case opened
     case merged
+    case closed
 
     var title: String {
         switch self {
@@ -84,6 +85,8 @@ nonisolated enum GitLabProjectMergeRequestState:
             "Open"
         case .merged:
             "Merged"
+        case .closed:
+            "Closed"
         }
     }
 
@@ -93,6 +96,8 @@ nonisolated enum GitLabProjectMergeRequestState:
             .mergeRequestOpen
         case .merged:
             .merged
+        case .closed:
+            .mergeRequestClosed
         }
     }
 
@@ -101,7 +106,8 @@ nonisolated enum GitLabProjectMergeRequestState:
     ) -> Bool {
         switch (self, mergeRequest.stateKind) {
         case (.opened, .opened),
-             (.merged, .merged):
+             (.merged, .merged),
+             (.closed, .closed):
             true
         default:
             false

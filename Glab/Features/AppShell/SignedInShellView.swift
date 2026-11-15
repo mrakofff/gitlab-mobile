@@ -100,6 +100,8 @@ struct SignedInShellView: View {
         any GitLabIssueStatusServing
     private let issueCreationService:
         any GitLabIssueCreationServing
+    private let mergeRequestCreationService:
+        any GitLabMergeRequestCreationServing
     private let mentionService:
         any GitLabMentionSearching
     private let projectLoader:
@@ -242,6 +244,10 @@ struct SignedInShellView: View {
             LiveGitLabIssueCreationService(
                 client: client
             )
+        let mergeRequestCreationService =
+            LiveGitLabMergeRequestCreationService(
+                client: client
+            )
         let mentionService =
             LiveGitLabMentionService(
                 client: client
@@ -270,6 +276,8 @@ struct SignedInShellView: View {
             issueStatusService
         self.issueCreationService =
             issueCreationService
+        self.mergeRequestCreationService =
+            mergeRequestCreationService
         self.mentionService =
             mentionService
         self.projectLoader = projectLoader
@@ -469,6 +477,8 @@ struct SignedInShellView: View {
                         issueStatusService,
                     issueCreationService:
                         issueCreationService,
+                    mergeRequestCreationService:
+                        mergeRequestCreationService,
                     projectLoader: projectLoader,
                     projectStarringService:
                         projectStarringService,

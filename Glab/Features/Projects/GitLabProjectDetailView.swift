@@ -31,6 +31,8 @@ struct GitLabProjectDetailView: View {
         any GitLabIssueStatusServing
     let issueCreationService:
         any GitLabIssueCreationServing
+    let mergeRequestCreationService:
+        any GitLabMergeRequestCreationServing
     let commitLoader:
         any GitLabCommitLoading
     let repositoryLoader:
@@ -84,6 +86,8 @@ struct GitLabProjectDetailView: View {
             any GitLabIssueStatusServing,
         issueCreationService:
             any GitLabIssueCreationServing,
+        mergeRequestCreationService:
+            any GitLabMergeRequestCreationServing,
         commitLoader:
             any GitLabCommitLoading,
         repositoryLoader:
@@ -123,6 +127,8 @@ struct GitLabProjectDetailView: View {
             issueStatusService
         self.issueCreationService =
             issueCreationService
+        self.mergeRequestCreationService =
+            mergeRequestCreationService
         self.commitLoader =
             commitLoader
         self.repositoryLoader =
@@ -333,6 +339,8 @@ struct GitLabProjectDetailView: View {
                         issueStatusService,
                     issueCreationService:
                         issueCreationService,
+                    mergeRequestCreationService:
+                        mergeRequestCreationService,
                     overviewLoader: overviewLoader,
                     apiAccess: apiAccess,
                     accountID: accountID,
@@ -1032,6 +1040,10 @@ struct GitLabProjectDetailView: View {
             discussionMutator: discussionMutator,
             reactionService: reactionService,
             editService: editService,
+            apiAccess: apiAccess,
+            branchLoader: repositoryLoader,
+            creationService:
+                mergeRequestCreationService,
             accountID: accountID,
             appSession: appSession,
             onResourceEdited: onResourceEdited

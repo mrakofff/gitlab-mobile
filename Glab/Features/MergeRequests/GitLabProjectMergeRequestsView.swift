@@ -22,6 +22,10 @@ struct GitLabProjectMergeRequestsView: View {
             & GitLabEmojiReactionMutating
     let editService:
         any GitLabResourceEditing
+    let apiAccess: GitLabAPIAccess
+    let branchLoader: any GitLabRepositoryBrowsing
+    let creationService:
+        any GitLabMergeRequestCreationServing
     let accountID: GitLabAccountID
     let appSession: AppSession
     let onResourceEdited:
@@ -29,6 +33,8 @@ struct GitLabProjectMergeRequestsView: View {
 
     @State private var model:
         ProjectMergeRequestsModel
+    @State private var createdMergeRequest:
+        GitLabMergeRequestRoute?
 
     init(
         project: GitLabProject,
@@ -52,6 +58,10 @@ struct GitLabProjectMergeRequestsView: View {
                 & GitLabEmojiReactionMutating,
         editService:
             any GitLabResourceEditing,
+        apiAccess: GitLabAPIAccess,
+        branchLoader: any GitLabRepositoryBrowsing,
+        creationService:
+            any GitLabMergeRequestCreationServing,
         accountID: GitLabAccountID,
         appSession: AppSession,
         onResourceEdited:
@@ -74,6 +84,10 @@ struct GitLabProjectMergeRequestsView: View {
         self.reactionService =
             reactionService
         self.editService = editService
+        self.apiAccess = apiAccess
+        self.branchLoader = branchLoader
+        self.creationService =
+            creationService
         self.accountID = accountID
         self.appSession = appSession
         self.onResourceEdited =
@@ -100,6 +114,49 @@ struct GitLabProjectMergeRequestsView: View {
 
             mergeRequestList
         }
+        .gitLabProjectMergeRequestCreation(
+            project: project,
+            apiAccess: apiAccess,
+            branchLoader: branchLoader,
+            creationService: creationService,
+            accountID: accountID,
+            appSession: appSession,
+            onCreated: didCreate
+        )
+        .navigationDestination(
+            item: $createdMergeRequest
+        ) { route in
+            GitLabMergeRequestDetailView(
+                route: route,
+                loader: loader,
+                approvalService:
+                    approvalService,
+                mergeService: mergeService,
+                pipelineLoader:
+                    pipelineLoader,
+                discussionLoader:
+                    discussionLoader,
+                discussionMutator:
+                    discussionMutator,
+                reactionService:
+                    reactionService,
+                editService: editService,
+                accountID: accountID,
+                appSession: appSession,
+                onResourceEdited:
+                    reconcileEditedResource
+            )
+        }
+    }
+
+    private func didCreate(
+        _ mergeRequest: GitLabMergeRequest
+    ) {
+        model.reconcileCreatedMergeRequest(
+            mergeRequest
+        )
+        createdMergeRequest =
+            mergeRequest.route
     }
 
     private var mergeRequestList: some View {
@@ -164,6 +221,8 @@ struct GitLabProjectMergeRequestsView: View {
             "Open merge requests in \(project.name) will appear here."
         case .merged:
             "Merged merge requests in \(project.name) will appear here."
+        case .closed:
+            "Closed merge requests in \(project.name) will appear here."
         }
     }
 
