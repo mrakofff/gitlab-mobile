@@ -1,6 +1,6 @@
 # Задача: Фаза 9 — MR-флоу (Closed-фильтр + New merge request)
 
-**Статус:** open
+**Статус:** done (коммит f3902cb, 2026-11-15)
 **План:** ~/.claude/plans/composed-forging-volcano.md — «Дополнение (2026-11-14)»
 **Создана:** 2026-11-14
 **Референс:** /Users/andrei/glab-reference r18–r19 (NOTES.md)

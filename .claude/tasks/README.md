@@ -17,11 +17,11 @@
 | [phase-5 Diff review](2026-11-07-glab-clone-phase-5.md) | open | — |
 | [phase-6 Брендинг](2026-11-07-glab-clone-phase-6.md) | open | — |
 | [phase-8 Repository browsing (blame/история/теги)](2026-11-14-glab-clone-phase-8-repository-browsing.md) | done (991ea0a, 45aa372) | phase-9 |
-| [phase-9 MR-флоу (Closed + New MR)](2026-11-14-glab-clone-phase-9-mr-flow.md) | open | phase-10 |
+| [phase-9 MR-флоу (Closed + New MR)](2026-11-14-glab-clone-phase-9-mr-flow.md) | done (f3902cb) | phase-10 |
 | [phase-10 Shell Home/Inbox/Search + поиск users](2026-11-14-glab-clone-phase-10-shell-search.md) | open | — |
 
 Порядок исполнения (решено 2026-11-14 по референсу r01–r20):
-phase-8 (done) → **phase-9** → phase-10;
+phase-8, phase-9 (done) → **phase-10**;
 phase-3/4/5/6 — из основного плана, вставляются по готовности
 (обоснование — в плане ~/.claude/plans/composed-forging-volcano.md, раздел
 «Дополнение (2026-11-14)»).
@@ -35,3 +35,4 @@ phase-3/4/5/6 — из основного плана, вставляются п�
 | [phase-2b Project detail до референса](2026-11-14-glab-clone-phase-2b-project-detail.md) | 2026-11-14 | e4e6dd1, 90c473f |
 | [phase-7 Настраиваемый Home + CI](2026-11-07-glab-clone-phase-7-home-modules.md) | 2026-11-14 | 62ff3b9 |
 | [phase-8 Repository browsing](2026-11-14-glab-clone-phase-8-repository-browsing.md) | 2026-11-15 | e021e73, 991ea0a, 45aa372 |
+| [phase-9 MR-флоу (Closed + New MR)](2026-11-14-glab-clone-phase-9-mr-flow.md) | 2026-11-15 | f3902cb |
