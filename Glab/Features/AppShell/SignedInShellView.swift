@@ -90,6 +90,8 @@ struct SignedInShellView: View {
         TodoCatchUpModel
     @State private var globalSearchModel:
         GitLabGlobalSearchModel
+    @State private var inboxModel:
+        GitLabInboxModel
     @State private var deepLinkResolutionModel:
         GitLabDeepLinkResolutionModel
     @State private var incomingRoute:
@@ -282,6 +284,9 @@ struct SignedInShellView: View {
         let todoService = LiveGitLabTodoLoader(
             client: client
         )
+        let inboxLoader = LiveGitLabInboxLoader(
+            client: client
+        )
         self.issueLoader = issueLoader
         self.mergeRequestLoader = mergeRequestLoader
         self.mergeRequestApprovalService =
@@ -449,6 +454,11 @@ struct SignedInShellView: View {
                         )
                 )
         )
+        _inboxModel = State(
+            initialValue: GitLabInboxModel(
+                loader: inboxLoader
+            )
+        )
         _deepLinkResolutionModel = State(
             initialValue:
                 GitLabDeepLinkResolutionModel(
@@ -518,6 +528,7 @@ struct SignedInShellView: View {
                         repositoryLoader,
                     searchModel:
                         globalSearchModel,
+                    inboxModel: inboxModel,
                     incomingRoute:
                         incomingRoute,
                     onResourceEdited:

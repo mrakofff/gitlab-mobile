@@ -6,6 +6,7 @@ private enum HomeNavigationRoute: Hashable {
     case reviews
     case pipelines
     case editHome
+    case inbox
 }
 
 enum HomeSheetDestination: Identifiable {
@@ -99,6 +100,7 @@ struct HomeView: View {
     let repositoryLoader:
         any GitLabRepositoryLoading
     let searchModel: GitLabGlobalSearchModel
+    let inboxModel: GitLabInboxModel
     let incomingRoute: GitLabNativeRoute?
     let onResourceEdited:
         (GitLabResourceEditResult) -> Void
@@ -208,6 +210,8 @@ struct HomeView: View {
                         accountID: accountID,
                         appSession: appSession
                     )
+                case .inbox:
+                    inboxView
                 case .reviews:
                     mergeRequestsDestination(
                         initialMode: .reviewRequested
@@ -1149,10 +1153,39 @@ struct HomeView: View {
                 mergeRequestsModuleCount,
             onSeeAll: {
                 path.append(
-                    HomeDashboardSection
-                        .assignedMergeRequests
+                    HomeNavigationRoute.inbox
                 )
             }
+        )
+    }
+
+    private var inboxView: some View {
+        GitLabInboxView(
+            session: session,
+            accountID: accountID,
+            appSession: appSession,
+            model: inboxModel,
+            issueLoader: issueLoader,
+            mergeRequestLoader:
+                mergeRequestLoader,
+            mergeRequestApprovalService:
+                mergeRequestApprovalService,
+            mergeRequestMergeService:
+                mergeRequestMergeService,
+            pipelineLoader:
+                pipelineLoader,
+            discussionLoader:
+                discussionLoader,
+            discussionMutator:
+                discussionMutator,
+            reactionService:
+                reactionService,
+            editService:
+                editService,
+            issueStatusService:
+                issueStatusService,
+            onResourceEdited:
+                onResourceEdited
         )
     }
 
