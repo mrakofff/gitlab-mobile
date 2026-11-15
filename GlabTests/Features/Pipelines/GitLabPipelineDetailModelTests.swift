@@ -1011,4 +1011,14 @@ private actor PipelineDetailLoader:
         await onPage(result.event)
         return result.selectedCapability
     }
+
+    func loadPipelineTestReport(
+        at route: GitLabPipelineRoute
+    ) async throws(GitLabSessionClientError)
+        -> GitLabPipelineTestReport
+    {
+        fatalError(
+            "No test report in these tests"
+        )
+    }
 }

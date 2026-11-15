@@ -81,7 +81,9 @@ struct GitLabPipelineDetailView: View {
         GlabList {
             pipelineSection
             failureRows
+            stageChipStrip
             stageRows
+            testReportSection
         }
         .listStyle(.insetGrouped)
         .listSectionSpacing(.compact)
@@ -274,9 +276,261 @@ struct GitLabPipelineDetailView: View {
             }
         case let .loaded(pipeline):
             Section {
+                if pipeline.status.rawValue
+                    == "failed"
+                {
+                    retryFailedButton
+                }
                 GitLabPipelineHeader(
-                    pipeline: pipeline
+                    pipeline: pipeline,
+                    jobs: model.stages
+                        .flatMap(\.rows)
                 )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var retryFailedButton:
+        some View
+    {
+        if let retry = actionModel?
+            .availablePipelineActions
+            .first(where: {
+                $0 == .retryPipeline
+            })
+        {
+            Button {
+                actionModel?.request(retry)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(
+                        systemName:
+                            retry.systemImage
+                    )
+                    Text(retry.title)
+                        .font(
+                            .glabBody.weight(.semibold)
+                        )
+                }
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 40)
+            }
+            .buttonStyle(.glass)
+            .tint(.red)
+            .disabled(
+                actionModel?.isBusy == true
+            )
+            .accessibilityIdentifier(
+                "pipelines.detail.retryFailed"
+            )
+        }
+    }
+
+    /// Horizontal strip of aggregated
+    /// stage chips: `prepare 1/1 › checks 3/3`.
+    @ViewBuilder
+    private var stageChipStrip: some View {
+        if !model.stages.isEmpty {
+            Section {
+                ScrollView(
+                    .horizontal,
+                    showsIndicators: false
+                ) {
+                    HStack(spacing: 6) {
+                        ForEach(model.stages) {
+                            stage in
+                            GitLabPipelineStageChip(
+                                stage: stage
+                            )
+                        }
+                    }
+                    .padding(.vertical, 1)
+                }
+                .accessibilityIdentifier(
+                    "pipelines.detail.stageChips"
+                )
+            }
+        }
+    }
+
+    /// Test report section: suite cards
+    /// plus failed cases, with a fallback
+    /// to failed jobs when the instance
+    /// does not expose test reports.
+    @ViewBuilder
+    private var testReportSection: some View {
+        switch model.testReportState {
+        case .idle:
+            EmptyView()
+        case .loading:
+            Section {
+                loadingRow("Loading tests…")
+            }
+        case let .failed(error):
+            Section {
+                GitLabInlineRetryRow(
+                    title:
+                        "Couldn’t load test report",
+                    error: error,
+                    accessibilityIdentifier:
+                        "pipelines.detail.testReportError"
+                ) {
+                    Task {
+                        await model.retryTestReport()
+                        await handleAuthenticationFailure()
+                    }
+                }
+            }
+        case .unavailable:
+            failedJobsSection(
+                title: "Failed jobs"
+            )
+        case let .loaded(report):
+            if report.failureCount > 0 {
+                testReportSectionLoaded(
+                    report
+                )
+                failedJobsSection(
+                    title: "Failed jobs"
+                )
+            } else {
+                testReportSectionPassed(
+                    report
+                )
+            }
+        }
+    }
+
+    private func testReportSectionLoaded(
+        _ report:
+            GitLabPipelineTestReport
+    ) -> some View {
+        Section {
+            ForEach(report.suites) { suite in
+                VStack(
+                    alignment: .leading,
+                    spacing: 6
+                ) {
+                    HStack(spacing: 8) {
+                        Text(suite.name)
+                            .font(
+                                .glabBody.weight(
+                                    .semibold
+                                )
+                            )
+                            .lineLimit(1)
+                        Spacer()
+                        if suite.failedCount > 0 {
+                            Text(
+                                "\(suite.failedCount) failed"
+                            )
+                            .font(.glabCaption)
+                            .foregroundStyle(.red)
+                        }
+                    }
+
+                    ForEach(suite.failedCases) {
+                        testCase in
+                        HStack(
+                            alignment: .top,
+                            spacing: 8
+                        ) {
+                            Image(
+                                systemName:
+                                    "xmark.octagon.fill"
+                            )
+                            .font(.glabCaption)
+                            .foregroundStyle(.red)
+                            .accessibilityHidden(
+                                true
+                            )
+
+                            VStack(
+                                alignment: .leading,
+                                spacing: 1
+                            ) {
+                                Text(testCase.name)
+                                    .font(.glabCaption)
+                                    .lineLimit(2)
+                                if
+                                    let className =
+                                        testCase
+                                        .className
+                                {
+                                    Text(className)
+                                        .font(.glabCaption)
+                                        .foregroundStyle(
+                                            .tertiary
+                                        )
+                                        .lineLimit(1)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        } header: {
+            Text(
+                "Tests · \(report.failureCount) failed"
+            )
+        }
+    }
+
+    private func testReportSectionPassed(
+        _ report:
+            GitLabPipelineTestReport
+    ) -> some View {
+        Section {
+            HStack(spacing: 8) {
+                Image(
+                    systemName:
+                        "checkmark.circle.fill"
+                )
+                .font(.glabBody)
+                .foregroundStyle(.green)
+                .accessibilityHidden(true)
+
+                Text(
+                    "\(report.totalCount) tests passed"
+                        + (report
+                            .totalTime
+                            .flatMap {
+                                GitLabDurationFormatter
+                                    .string(
+                                        seconds: $0
+                                    )
+                            }
+                            .map { " in \($0)" }
+                            ?? "")
+                )
+                .font(.glabBody)
+            }
+        } header: {
+            Text("Tests")
+        }
+        .accessibilityIdentifier(
+            "pipelines.detail.testsPassed"
+        )
+    }
+
+    @ViewBuilder
+    private func failedJobsSection(
+        title: String
+    ) -> some View {
+        let failedRows = model.stages
+            .flatMap(\.rows)
+            .filter {
+                $0.status.rawValue == "failed"
+            }
+        if !failedRows.isEmpty {
+            Section {
+                ForEach(failedRows) { row in
+                    pipelineRow(row)
+                }
+            } header: {
+                Text(title)
             }
         }
     }

@@ -111,6 +111,19 @@ nonisolated enum GitLabPipelineEndpoints {
         )
     }
 
+    static func testReport(
+        at route: GitLabPipelineRoute
+    ) -> GitLabAPIRequest<
+        GitLabPipelineTestReport
+    > {
+        .get(
+            requires: .read,
+            path:
+                pipelinePath(route)
+                + ["test_report"]
+        )
+    }
+
     static func legacyTriggerJobs(
         at route: GitLabPipelineRoute
     ) -> GitLabAPIRequest<

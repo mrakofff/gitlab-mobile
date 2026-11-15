@@ -757,4 +757,12 @@ private actor PipelineHistoryLoader:
     {
         fatalError("Not used by history model tests")
     }
+
+    func loadPipelineTestReport(
+        at route: GitLabPipelineRoute
+    ) async throws(GitLabSessionClientError)
+        -> GitLabPipelineTestReport
+    {
+        fatalError("Not used by history model tests")
+    }
 }

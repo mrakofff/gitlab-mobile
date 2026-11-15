@@ -115,6 +115,11 @@ nonisolated protocol GitLabPipelineLoading:
             ) async -> Void
     ) async throws(GitLabSessionClientError)
         -> GitLabPipelineTriggerJobsCapability
+
+    func loadPipelineTestReport(
+        at route: GitLabPipelineRoute
+    ) async throws(GitLabSessionClientError)
+        -> GitLabPipelineTestReport
 }
 
 nonisolated struct LiveGitLabPipelineLoader:
@@ -508,6 +513,19 @@ nonisolated struct LiveGitLabPipelineLoader:
         guard await validation.isValid else {
             throw .api(.invalidResponse)
         }
+    }
+
+    @concurrent
+    func loadPipelineTestReport(
+        at route: GitLabPipelineRoute
+    ) async throws(GitLabSessionClientError)
+        -> GitLabPipelineTestReport
+    {
+        try await client.send(
+            GitLabPipelineEndpoints.testReport(
+                at: route
+            )
+        )
     }
 
     private static func triggerJobsEndpoint(

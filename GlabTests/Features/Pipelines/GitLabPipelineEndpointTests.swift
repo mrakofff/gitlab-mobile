@@ -159,6 +159,21 @@ struct GitLabPipelineEndpointTests {
         #expect(legacy.requiredAccess == .read)
     }
 
+    @Test("Builds a pipeline test report route")
+    func buildsTestReport() throws {
+        let endpoint =
+            GitLabPipelineEndpoints
+            .testReport(at: try route())
+
+        #expect(endpoint.method == .get)
+        #expect(endpoint.requiredAccess == .read)
+        #expect(
+            endpoint.pathComponents
+                == pipelinePath + ["test_report"]
+        )
+        #expect(endpoint.queryItems.isEmpty)
+    }
+
     @Test("Pipeline route requires positive project and pipeline IDs")
     func validatesPipelineRoute() {
         #expect(

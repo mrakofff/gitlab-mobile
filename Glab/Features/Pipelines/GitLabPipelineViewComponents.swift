@@ -68,60 +68,223 @@ struct GitLabPipelineHistoryRow: View {
 
 struct GitLabPipelineHeader: View {
     let pipeline: GitLabPipeline
+    let jobs:
+        [GitLabPipelineStageRow]
+
+    private var totalJobs: Int {
+        jobs.count
+    }
+
+    private var finishedJobs: Int {
+        jobs.filter {
+            $0.status.isTerminal
+        }
+        .count
+    }
+
+    private var failedJobs: Int {
+        jobs.filter {
+            $0.status.rawValue == "failed"
+        }
+        .count
+    }
 
     var body: some View {
         VStack(
             alignment: .leading,
-            spacing: 8
+            spacing: 10
         ) {
-            if let name = pipeline.name {
-                Text(name)
-                    .font(
-                        .glabHeadline
-                    )
-            }
-
-            HStack(spacing: 8) {
+            HStack(
+                alignment: .center,
+                spacing: 8
+            ) {
                 GitLabCIStatusIcon(
                     status: pipeline.status
                 )
 
-                Text(pipeline.status.title)
+                VStack(
+                    alignment: .leading,
+                    spacing: 2
+                ) {
+                    Text(
+                        pipeline.status.title
+                    )
                     .font(
-                        .glabBody.weight(.semibold)
+                        .glabHeadline.weight(
+                            .semibold
+                        )
                     )
                     .foregroundStyle(
                         pipeline.status.tint
                     )
 
-                Text(pipeline.displayID)
-                    .font(
-                        .caption
+                    statusSubtitle
+                        .font(.glabCaption)
+                        .foregroundStyle(
+                            .secondary
+                        )
+                }
+
+                Spacer(minLength: 8)
+
+                if
+                    let durationText =
+                        pipeline
+                    .durationText
+                {
+                    Text(durationText)
+                        .font(
+                            .glabSubheadline
                             .monospacedDigit()
-                    )
-                    .foregroundStyle(.secondary)
+                            .weight(.semibold)
+                        )
+                        .foregroundStyle(
+                            .secondary
+                        )
+                }
             }
 
-            HStack(
-                alignment: .firstTextBaseline,
-                spacing: 6
-            ) {
-                Image(
-                    systemName:
-                        "arrow.triangle.branch"
-                )
+            if totalJobs > 0,
+                pipeline.status
+                .showsActivityAnimation
+            {
+                GeometryReader {
+                    proxy in
+                    Capsule()
+                        .fill(
+                            Color.glabSeparator
+                        )
+                        .overlay(alignment: .leading) {
+                            Capsule()
+                                .fill(
+                                    Color.glabAccent
+                                )
+                                .frame(
+                                    width: max(
+                                        8,
+                                        proxy.size.width
+                                            * CGFloat(
+                                                finishedJobs
+                                            )
+                                            / CGFloat(
+                                                totalJobs
+                                            )
+                                    )
+                                )
+                        }
+                }
+                .frame(height: 3)
                 .accessibilityHidden(true)
-
-                reference
-                    .lineLimit(3)
             }
-            .font(.glabSubheadline)
-            .foregroundStyle(.secondary)
 
-            if !pipeline.metadataSummary.isEmpty {
-                Text(
-                    pipeline.metadataSummary
+            Text(
+                pipeline.name
+                    ?? "Pipeline "
+                    + pipeline.displayID
+            )
+            .font(
+                .glabSubheadline.weight(
+                    .medium
                 )
+            )
+            .lineLimit(2)
+
+            HStack(spacing: 6) {
+                Text(pipeline.ref)
+                    .font(
+                        .glabCaption.weight(
+                            .medium
+                        )
+                    )
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Color.glabAccent.opacity(0.12),
+                        in: .capsule
+                    )
+
+                shaChip
+            }
+            .accessibilityElement(
+                children: .ignore
+            )
+            .accessibilityLabel(
+                "Branch \(pipeline.ref), commit \(pipeline.shortSHA)"
+            )
+            .accessibilityIdentifier(
+                "pipelines.detail.header.commitChips"
+            )
+
+            HStack(spacing: 5) {
+                if
+                    let author =
+                        pipeline.user?.displayName
+                {
+                    Text(author)
+                        .lineLimit(1)
+                }
+                if
+                    let source =
+                        pipeline.humanSource
+                {
+                    Text(source)
+                }
+                if
+                    let date =
+                        pipeline.createdAt
+                {
+                    Text(
+                        GitLabRelativeTimeFormatter
+                        .string(from: date)
+                    )
+                }
+            }
+            .font(.glabCaption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+
+            HStack(spacing: 8) {
+                GitLabStatTile(
+                    title: "Queued",
+                    value: pipeline
+                        .queuedDurationText
+                        ?? "—"
+                ) {
+                    Image(
+                        systemName: "hourglass"
+                    )
+                }
+
+                GitLabStatTile(
+                    title: "Finished",
+                    value: pipeline
+                        .finishedAtTimeText
+                        ?? "—"
+                ) {
+                    Image(
+                        systemName: "checkmark.circle"
+                    )
+                }
+            }
+            .padding(.vertical, 2)
+
+            if
+                let updatedAt =
+                    pipeline.updatedAt
+            {
+                HStack(spacing: 4) {
+                    Image(
+                        systemName: "clock"
+                    )
+                    .accessibilityHidden(true)
+                    Text(
+                        "Updated at "
+                            + Self.timeFormatter
+                            .string(
+                                from: updatedAt
+                            )
+                    )
+                }
                 .font(.glabCaption)
                 .foregroundStyle(.secondary)
             }
@@ -135,14 +298,45 @@ struct GitLabPipelineHeader: View {
         )
     }
 
-    private var reference: Text {
-        let sha =
-            Text(pipeline.shortSHA)
-            .fontDesign(.monospaced)
+    private var statusSubtitle: Text {
+        let jobs = Text(
+            "Jobs: \(totalJobs)"
+        )
+        if failedJobs > 0 {
+            return Text(
+                "\(jobs) · \(failedJobs) failed"
+            )
+        }
+        if totalJobs > 0,
+            finishedJobs == totalJobs,
+            failedJobs == 0
+        {
+            return Text("\(jobs) · all passed")
+        }
         return Text(
-            "\(pipeline.ref)  \(sha)"
+            "\(jobs) · \(finishedJobs) finished"
         )
     }
+
+    private var shaChip: some View {
+        Text(pipeline.shortSHA)
+            .fontDesign(.monospaced)
+            .font(.glabCaption)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                Color.glabAccent.opacity(0.12),
+                in: .capsule
+            )
+    }
+
+    private static let timeFormatter:
+        DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .none
+            formatter.timeStyle = .short
+            return formatter
+        }()
 }
 
 struct GitLabPipelineJobRow: View {
@@ -173,6 +367,18 @@ struct GitLabPipelineJobRow: View {
                     .foregroundStyle(.secondary)
 
                 if
+                    let artifactText =
+                        row.artifactText
+                {
+                    Text(artifactText)
+                        .font(.glabCaption)
+                        .foregroundStyle(
+                            .tertiary
+                        )
+                        .lineLimit(1)
+                }
+
+                if
                     let downstreamSummary =
                         row.downstreamSummary
                 {
@@ -199,6 +405,155 @@ struct GitLabPipelineJobRow: View {
         .accessibilityIdentifier(
             row.accessibilityIdentifier
         )
+    }
+}
+
+struct GitLabPipelineStageChip: View {
+    let stage: GitLabPipelineStage
+
+    var body: some View {
+        let total = stage.rows.count
+        let done = stage.rows.filter {
+            $0.status.isTerminal
+        }
+        .count
+
+        return HStack(spacing: 5) {
+            GitLabCIStatusIcon(
+                status: stage.status
+            )
+
+            Text(stage.name)
+                .font(
+                    .glabCaption.weight(.medium)
+                )
+                .lineLimit(1)
+
+            Text("\(done)/\(total)")
+                .font(
+                    .glabCaption
+                    .monospacedDigit()
+                )
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(
+            Color.glabAccent.opacity(0.12),
+            in: .capsule
+        )
+        .accessibilityElement(
+            children: .ignore
+        )
+        .accessibilityLabel(
+            "Stage \(stage.name), \(done) of \(total) jobs finished"
+        )
+    }
+}
+
+extension GitLabPipeline {
+    /// "Merge request event · Nitesh
+    /// Balusu" style trigger summary line.
+    var humanSource: String? {
+        guard let source else {
+            return nil
+        }
+        let title =
+            source.replacingOccurrences(
+                of: "_",
+                with: " "
+            )
+        .capitalized
+        return source.contains("_")
+            ? title
+            : nil
+    }
+
+    var durationText: String? {
+        duration.flatMap {
+            GitLabDurationFormatter.string(
+                seconds: $0
+            )
+        }
+    }
+
+    var queuedDurationText: String? {
+        queuedDuration
+            .flatMap {
+                GitLabDurationFormatter.string(
+                    seconds: $0
+                )
+            }
+    }
+
+    var finishedAtTimeText: String? {
+        guard let finishedAt else {
+            return nil
+        }
+        return Self.clockFormatter.string(
+            from: finishedAt
+        )
+    }
+
+    private static let clockFormatter:
+        DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .none
+            formatter.timeStyle = .short
+            return formatter
+        }()
+}
+
+extension GitLabPipelineStage {
+    /// Aggregated status: failed wins over
+    /// running over waiting over terminal
+    /// success — mirrors how a stage reads at
+    /// a glance in CI dashboards.
+    var status: GitLabCIStatus {
+        if rows.contains(where: {
+            $0.status.rawValue == "failed"
+        }) {
+            return GitLabCIStatus(
+                rawValue: "failed"
+            )
+        }
+        if rows.contains(where: {
+            $0.status.isActiveLike
+        }) {
+            return GitLabCIStatus(
+                rawValue: "running"
+            )
+        }
+        if rows.contains(where: {
+            $0.status.showsWaitingIndicator
+        }) {
+            return GitLabCIStatus(
+                rawValue: "pending"
+            )
+        }
+        if rows.contains(where: {
+            $0.status.rawValue == "manual"
+        }) {
+            return GitLabCIStatus(
+                rawValue: "manual"
+            )
+        }
+        return GitLabCIStatus(
+            rawValue: "success"
+        )
+    }
+}
+
+private extension GitLabCIStatus {
+    var isActiveLike: Bool {
+        switch rawValue {
+        case "running",
+             "canceling",
+             "preparing":
+            true
+        default:
+            false
+        }
     }
 }
 
@@ -313,6 +668,22 @@ extension GitLabPipelineStageRow {
         }
         return GitLabDurationFormatter
             .string(seconds: duration)
+    }
+
+    var artifactText: String? {
+        guard
+            case let .job(job) = content,
+            job.artifactSummary.totalSize > 0
+        else {
+            return nil
+        }
+        return ByteCountFormatter.string(
+            fromByteCount: Int64(
+                job.artifactSummary.totalSize
+            ),
+            countStyle: .file
+        )
+        + " artifacts"
     }
 
     var downstreamSummary: String? {

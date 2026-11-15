@@ -1,6 +1,21 @@
 import Foundation
 import Observation
 
+nonisolated enum
+    GitLabPipelineTestReportState:
+    Equatable,
+    Sendable
+{
+    case idle
+    case loading
+    case loaded(GitLabPipelineTestReport)
+    /// The instance does not expose test reports
+    /// (older self-hosted installs); the detail
+    /// view falls back to failed jobs.
+    case unavailable
+    case failed(GitLabSessionClientError)
+}
+
 private actor GitLabPipelineTriggerCapabilityStore {
     private var capability =
         GitLabPipelineTriggerJobsCapability.preferred
@@ -47,6 +62,8 @@ final class GitLabPipelineDetailModel {
     private(set) var stages:
         [GitLabPipelineStage] = []
     private(set) var isProjectingStages = false
+    private(set) var testReportState =
+        GitLabPipelineTestReportState.idle
 
     @ObservationIgnored
     private let loader:
@@ -71,6 +88,11 @@ final class GitLabPipelineDetailModel {
         UInt64 = 0
     @ObservationIgnored
     private var isLoadingPipeline = false
+    @ObservationIgnored
+    private var testReportGeneration:
+        UInt64 = 0
+    @ObservationIgnored
+    private var isLoadingTestReport = false
 
     init(
         accountID: GitLabAccountID,
@@ -180,6 +202,7 @@ final class GitLabPipelineDetailModel {
             triggerJobsLoad
         )
         await projectStages()
+        await refreshTestReportIfNeeded()
     }
 
     func refresh() async {
@@ -201,8 +224,8 @@ final class GitLabPipelineDetailModel {
             triggerJobsLoad
         )
         await projectStages()
+        await refreshTestReportIfNeeded()
     }
-
     func loadNextJobsPageIfNeeded(
         after job: GitLabPipelineJob
     ) async {
@@ -243,6 +266,91 @@ final class GitLabPipelineDetailModel {
         await projectStages()
     }
 
+    func retryTestReport() async {
+        guard accountScope.check() else {
+            return
+        }
+        await loadTestReport(refreshBehavior: .always)
+    }
+
+    private func refreshTestReportIfNeeded() async {
+        // Test reports matter only while jobs can
+        // expose failures; skip loading otherwise.
+        guard
+            stages.contains(where: {
+                $0.rows.contains {
+                    $0.status.rawValue == "failed"
+                }
+            })
+        else {
+            testReportState = .idle
+            return
+        }
+        await loadTestReport(
+            refreshBehavior: .ifStale
+        )
+    }
+
+    private func loadTestReport(
+        refreshBehavior:
+            GitLabCacheRefreshBehavior
+    ) async {
+        guard
+            accountScope.check(),
+            !isLoadingTestReport
+        else {
+            return
+        }
+
+        testReportGeneration &+= 1
+        let generation = testReportGeneration
+        isLoadingTestReport = true
+        if case .idle = testReportState {
+            testReportState = .loading
+        }
+
+        defer {
+            if testReportGeneration == generation
+            {
+                isLoadingTestReport = false
+            }
+        }
+
+        do {
+            let report = try await loader
+                .loadPipelineTestReport(at: route)
+            guard
+                !Task.isCancelled,
+                accountScope.check(),
+                testReportGeneration == generation
+            else {
+                return
+            }
+            testReportState = .loaded(report)
+        } catch {
+            guard
+                !Task.isCancelled,
+                error != .api(.cancelled),
+                accountScope.check(),
+                testReportGeneration == generation
+            else {
+                return
+            }
+            if case GitLabSessionClientError
+                .api(.notFound) = error
+            {
+                testReportState = .unavailable
+            } else if
+                case .unavailable = testReportState
+            {
+                // Keep the "not exposed by instance"
+                // state stable across failures.
+            } else {
+                testReportState = .failed(error)
+            }
+        }
+    }
+
     func reconcileActionPipeline(
         _ pipeline: GitLabPipeline
     ) {
@@ -261,7 +369,6 @@ final class GitLabPipelineDetailModel {
         pipelineSource = .network
         pipelineCacheStoredAt = nil
     }
-
     func reconcileActionJob(
         _ job: GitLabPipelineJob
     ) async {

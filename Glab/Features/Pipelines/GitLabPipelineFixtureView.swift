@@ -157,10 +157,16 @@
             else {
                 throw .api(.notFound)
             }
-            let jobs =
-                route.pipelineID == 501
-                ? Self.jobs
-                : Self.childJobs
+            let jobs:
+                [GitLabPipelineJob] =
+                switch route.pipelineID {
+                case 501:
+                    Self.jobs
+                case 499:
+                    Self.failedJobs
+                default:
+                    Self.childJobs
+                }
             return GitLabResourcePage(
                 items: jobs,
                 nextPageURL: nil,
@@ -293,9 +299,22 @@
                     "id": 499,
                     "iid": 89,
                     "project_id": 42,
+                    "name": "Merge request validation",
                     "sha": "2b1a09876543211234567890abcdef1234567890",
                     "ref": "refs/merge-requests/7/head",
-                    "status": "failed"
+                    "status": "failed",
+                    "source": "merge_request_event",
+                    "created_at": "2026-11-15T05:20:00Z",
+                    "updated_at": "2026-11-15T05:41:00Z",
+                    "finished_at": "2026-11-15T05:41:00Z",
+                    "duration": 187,
+                    "queued_duration": 5,
+                    "web_url": "https://gitlab.example.com/group/project/-/pipelines/499",
+                    "user": {
+                      "id": 7,
+                      "username": "nitesh",
+                      "name": "Nitesh Balusu"
+                    }
                   },
                   {
                     "id": 498,
@@ -390,6 +409,52 @@
                 """
             )
 
+        private static let failedJobs:
+            [GitLabPipelineJob] =
+            decode(
+                """
+                [
+                  {
+                    "id": 800,
+                    "name": "prepare",
+                    "stage": "prepare",
+                    "status": "success",
+                    "duration": 8,
+                    "web_url": "https://gitlab.example.com/group/project/-/jobs/800",
+                    "pipeline": {"id": 499, "project_id": 42}
+                  },
+                  {
+                    "id": 801,
+                    "name": "swiftlint",
+                    "stage": "checks",
+                    "status": "success",
+                    "duration": 22,
+                    "web_url": "https://gitlab.example.com/group/project/-/jobs/801",
+                    "pipeline": {"id": 499, "project_id": 42}
+                  },
+                  {
+                    "id": 802,
+                    "name": "Unit tests on iPhone 17 Pro",
+                    "stage": "checks",
+                    "status": "failed",
+                    "allow_failure": false,
+                    "duration": 41,
+                    "web_url": "https://gitlab.example.com/group/project/-/jobs/802",
+                    "pipeline": {"id": 499, "project_id": 42}
+                  },
+                  {
+                    "id": 803,
+                    "name": "Security scan",
+                    "stage": "checks",
+                    "status": "success",
+                    "duration": 15,
+                    "web_url": "https://gitlab.example.com/group/project/-/jobs/803",
+                    "pipeline": {"id": 499, "project_id": 42}
+                  }
+                ]
+                """
+            )
+
         private static let childJobs:
             [GitLabPipelineJob] =
             decode(
@@ -466,6 +531,73 @@
                 """
             )
 
+        func loadPipelineTestReport(
+            at route: GitLabPipelineRoute
+        ) async throws(GitLabSessionClientError)
+            -> GitLabPipelineTestReport
+        {
+            guard route.pipelineID == 499 else {
+                throw .api(.notFound)
+            }
+            return Self.testReport
+        }
+
+        private static let testReport:
+            GitLabPipelineTestReport =
+            decode(
+                """
+                {
+                  "total_time": 52,
+                  "total_count": 14,
+                  "success_count": 11,
+                  "failed_count": 3,
+                  "test_suites": [
+                    {
+                      "name": "Unit tests",
+                      "failed_count": 2,
+                      "test_cases": [
+                        {
+                          "name": "testPipelineStatusPillRenders",
+                          "classname": "GitLabPipelineHeaderViewTests",
+                          "status": "failed",
+                          "time": 2.1
+                        },
+                        {
+                          "name": "testStageChipsShowProgress",
+                          "classname": "GitLabPipelineStageChipTests",
+                          "status": "failed",
+                          "time": 1.4
+                        },
+                        {
+                          "name": "testHeaderCardsAreCompact",
+                          "classname": "GitLabPipelineHeaderViewTests",
+                          "status": "success",
+                          "time": 0.8
+                        }
+                      ]
+                    },
+                    {
+                      "name": "Smoke tests",
+                      "failed_count": 1,
+                      "test_cases": [
+                        {
+                          "name": "testDetailLoadsFixturePipeline",
+                          "classname": "GitLabSmokeTests",
+                          "status": "failed",
+                          "time": 9.9
+                        },
+                        {
+                          "name": "testTabsRender",
+                          "status": "success",
+                          "time": 3.2
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """
+            )
+
         private static func pipeline(
             id: Int
         ) -> GitLabPipeline? {
@@ -478,7 +610,9 @@
             _ json: String
         ) -> Value
         where Value: Decodable & Sendable {
-            try! JSONDecoder().decode(
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try! decoder.decode(
                 Value.self,
                 from: Data(json.utf8)
             )
